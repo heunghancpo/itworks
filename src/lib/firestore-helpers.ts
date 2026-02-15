@@ -169,10 +169,29 @@ export async function getComments(ideaId: string) {
 export function subscribeToComments(ideaId: string, callback: (comments: any[]) => void) {
   const commentsRef = collection(db, 'ideas', ideaId, 'comments');
   const q = query(commentsRef, orderBy('createdAt', 'asc'));
-  
+
   return onSnapshot(q, (snapshot) => {
     const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     callback(comments);
+  });
+}
+
+export async function deleteComment(ideaId: string, commentId: string) {
+  const commentRef = doc(db, 'ideas', ideaId, 'comments', commentId);
+  await deleteDoc(commentRef);
+
+  const ideaRef = doc(db, 'ideas', ideaId);
+  await updateDoc(ideaRef, {
+    commentsCount: increment(-1),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateComment(ideaId: string, commentId: string, content: string) {
+  const commentRef = doc(db, 'ideas', ideaId, 'comments', commentId);
+  return await updateDoc(commentRef, {
+    content,
+    updatedAt: serverTimestamp(),
   });
 }
 
@@ -245,9 +264,20 @@ export async function addResource(ideaId: string, data: {
 export async function getResources(ideaId: string) {
   const resourcesRef = collection(db, 'ideas', ideaId, 'resources');
   const q = query(resourcesRef, orderBy('createdAt', 'desc'));
-  
+
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function deleteResource(ideaId: string, resourceId: string) {
+  const resourceRef = doc(db, 'ideas', ideaId, 'resources', resourceId);
+  await deleteDoc(resourceRef);
+
+  const ideaRef = doc(db, 'ideas', ideaId);
+  await updateDoc(ideaRef, {
+    resourcesCount: increment(-1),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 // ============================================
@@ -276,13 +306,53 @@ export async function getBusinesses() {
 
 export async function getProjects(businessId?: string) {
   let q = query(collection(db, 'projects'), orderBy('title'));
-  
+
   if (businessId) {
     q = query(collection(db, 'projects'), where('businessId', '==', businessId), orderBy('title'));
   }
-  
+
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function createProject(data: {
+  title: string;
+  description: string;
+  status: string;
+  businessId: string;
+  deadline?: string | null;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+}) {
+  return await addDoc(collection(db, 'projects'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateProject(projectId: string, data: Partial<any>) {
+  const projectRef = doc(db, 'projects', projectId);
+  return await updateDoc(projectRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteProject(projectId: string) {
+  const projectRef = doc(db, 'projects', projectId);
+  return await deleteDoc(projectRef);
+}
+
+export function subscribeToProjects(callback: (projects: any[]) => void, businessId?: string) {
+  let q = query(collection(db, 'projects'), orderBy('title'));
+  if (businessId) {
+    q = query(collection(db, 'projects'), where('businessId', '==', businessId), orderBy('title'));
+  }
+  return onSnapshot(q, (snapshot) => {
+    const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(projects);
+  });
 }
 
 // ============================================

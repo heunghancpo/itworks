@@ -5,10 +5,14 @@ import { auth } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import {
   createIdea,
+  updateIdea,
   subscribeToIdeas,
   toggleLike,
   addComment,
   addResource,
+  deleteComment,
+  updateComment,
+  deleteResource,
   getBusinesses,
   getProjects,
   getComments,
@@ -42,11 +46,11 @@ import toast from 'react-hot-toast';
 export default function IdeasPage() {
   const [user] = useAuthState(auth);
   
-  const [ideas, setIdeas] = useState([]);
-  const [filteredIdeas, setFilteredIdeas] = useState([]);
-  const [businesses, setBusinesses] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [selectedIdea, setSelectedIdea] = useState(null);
+  const [ideas, setIdeas] = useState<any[]>([]);
+  const [filteredIdeas, setFilteredIdeas] = useState<any[]>([]);
+  const [businesses, setBusinesses] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedIdea, setSelectedIdea] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   
@@ -63,6 +67,14 @@ export default function IdeasPage() {
   const [newIdeaProject, setNewIdeaProject] = useState('');
   const [newIdeaPriority, setNewIdeaPriority] = useState('medium');
   const [newIdeaTags, setNewIdeaTags] = useState('');
+
+  // 아이디어 수정
+  const [isEditIdeaOpen, setIsEditIdeaOpen] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<any>(null);
+  const [editIdeaTitle, setEditIdeaTitle] = useState('');
+  const [editIdeaContent, setEditIdeaContent] = useState('');
+  const [editIdeaPriority, setEditIdeaPriority] = useState('medium');
+  const [editIdeaTags, setEditIdeaTags] = useState('');
 
   // 데이터 로드
   useEffect(() => {
@@ -97,7 +109,7 @@ export default function IdeasPage() {
       filtered = filtered.filter(idea =>
         idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         idea.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        idea.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+        idea.tags?.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
     
@@ -152,14 +164,14 @@ export default function IdeasPage() {
         priority: newIdeaPriority,
         tags: newIdeaTags.split(',').map(t => t.trim()).filter(Boolean),
         authorId: user.uid,
-        authorName: user.displayName || user.email,
-        authorAvatar: user.photoURL,
+        authorName: user.displayName || user.email || '익명',
+        authorAvatar: user.photoURL || '',
       });
       
       // 활동 로그
       await logActivity({
         userId: user.uid,
-        userName: user.displayName || user.email,
+        userName: user.displayName || user.email || '익명',
         actionType: 'created_idea',
         entityType: 'idea',
         entityId: newIdeaTitle,
@@ -220,8 +232,8 @@ export default function IdeasPage() {
       await addComment(selectedIdea.id, {
         content,
         authorId: user.uid,
-        authorName: user.displayName || user.email,
-        authorAvatar: user.photoURL,
+        authorName: user.displayName || user.email || '익명',
+        authorAvatar: user.photoURL || '',
       });
       
       toast.success('댓글이 추가되었습니다');
@@ -256,7 +268,7 @@ export default function IdeasPage() {
 
   const handleCreateEvolution = async (title: string, content: string) => {
     if (!user || !selectedIdea) return;
-    
+
     try {
       await createIdea({
         projectId: selectedIdea.projectId,
@@ -266,16 +278,100 @@ export default function IdeasPage() {
         priority: 'medium',
         tags: [],
         authorId: user.uid,
-        authorName: user.displayName || user.email,
-        authorAvatar: user.photoURL,
+        authorName: user.displayName || user.email || '익명',
+        authorAvatar: user.photoURL || '',
         parentId: selectedIdea.id,
       });
-      
+
       toast.success('발전된 아이디어가 생성되었습니다');
       setIsDetailOpen(false);
     } catch (error) {
       console.error('Error creating evolution:', error);
       toast.error('아이디어 생성 실패');
+    }
+  };
+
+  const handleStatusChange = async (ideaId: string, newStatus: string) => {
+    if (!user) return;
+    try {
+      await updateIdea(ideaId, { status: newStatus });
+      await logActivity({
+        userId: user.uid,
+        userName: user.displayName || user.email || '익명',
+        actionType: 'status_changed',
+        entityType: 'idea',
+        entityId: ideaId,
+        metadata: { newStatus },
+      });
+      toast.success('상태가 변경되었습니다');
+      if (selectedIdea && selectedIdea.id === ideaId) {
+        handleOpenDetail({ ...selectedIdea, status: newStatus });
+      }
+    } catch (error) {
+      console.error('Error changing status:', error);
+      toast.error('상태 변경 실패');
+    }
+  };
+
+  const handleEditIdea = (idea: any) => {
+    setEditingIdea(idea);
+    setEditIdeaTitle(idea.title);
+    setEditIdeaContent(idea.content);
+    setEditIdeaPriority(idea.priority || 'medium');
+    setEditIdeaTags(idea.tags?.join(', ') || '');
+    setIsEditIdeaOpen(true);
+  };
+
+  const handleSaveEditIdea = async () => {
+    if (!editingIdea || !editIdeaTitle) return;
+    try {
+      await updateIdea(editingIdea.id, {
+        title: editIdeaTitle,
+        content: editIdeaContent,
+        priority: editIdeaPriority,
+        tags: editIdeaTags.split(',').map((t: string) => t.trim()).filter(Boolean),
+      });
+      toast.success('아이디어가 수정되었습니다');
+      setIsEditIdeaOpen(false);
+    } catch (error) {
+      console.error('Error editing idea:', error);
+      toast.error('수정 실패');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedIdea) return;
+    try {
+      await deleteComment(selectedIdea.id, commentId);
+      toast.success('댓글이 삭제되었습니다');
+      handleOpenDetail(selectedIdea);
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast.error('댓글 삭제 실패');
+    }
+  };
+
+  const handleUpdateComment = async (commentId: string, content: string) => {
+    if (!selectedIdea) return;
+    try {
+      await updateComment(selectedIdea.id, commentId, content);
+      toast.success('댓글이 수정되었습니다');
+      handleOpenDetail(selectedIdea);
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      toast.error('댓글 수정 실패');
+    }
+  };
+
+  const handleDeleteResource = async (resourceId: string) => {
+    if (!selectedIdea) return;
+    try {
+      await deleteResource(selectedIdea.id, resourceId);
+      toast.success('리소스가 삭제되었습니다');
+      handleOpenDetail(selectedIdea);
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+      toast.error('리소스 삭제 실패');
     }
   };
 
@@ -481,6 +577,8 @@ export default function IdeasPage() {
               onLike={handleLikeIdea}
               onComment={() => handleOpenDetail(idea)}
               onEvolve={() => handleOpenDetail(idea)}
+              onEdit={handleEditIdea}
+              onStatusChange={handleStatusChange}
             />
           );
         })}
@@ -505,8 +603,68 @@ export default function IdeasPage() {
           onSubmitComment={handleSubmitComment}
           onUploadResource={handleUploadResource}
           onCreateEvolution={handleCreateEvolution}
+          onStatusChange={handleStatusChange}
+          onDeleteComment={handleDeleteComment}
+          onUpdateComment={handleUpdateComment}
+          onDeleteResource={handleDeleteResource}
+          currentUserId={user?.uid}
         />
       )}
+
+      {/* 아이디어 수정 다이얼로그 */}
+      <Dialog open={isEditIdeaOpen} onOpenChange={setIsEditIdeaOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>아이디어 수정</DialogTitle>
+            <DialogDescription>아이디어 내용을 수정하세요</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-medium">제목</label>
+              <Input
+                value={editIdeaTitle}
+                onChange={e => setEditIdeaTitle(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">내용</label>
+              <Textarea
+                value={editIdeaContent}
+                onChange={e => setEditIdeaContent(e.target.value)}
+                rows={6}
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">우선순위</label>
+                <Select value={editIdeaPriority} onValueChange={setEditIdeaPriority}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">낮음</SelectItem>
+                    <SelectItem value="medium">보통</SelectItem>
+                    <SelectItem value="high">높음</SelectItem>
+                    <SelectItem value="urgent">긴급</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">태그 (쉼표로 구분)</label>
+                <Input
+                  value={editIdeaTags}
+                  onChange={e => setEditIdeaTags(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditIdeaOpen(false)}>취소</Button>
+              <Button onClick={handleSaveEditIdea}>수정 완료</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -17,8 +17,9 @@ import {
   Trash2,
   Link as LinkIcon
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
+import toast from 'react-hot-toast';
 import { ko } from 'date-fns/locale';
 import { Timestamp } from 'firebase/firestore';
 
@@ -37,7 +38,8 @@ interface IdeaCardProps {
   onComment: (ideaId: string) => void;
   onEvolve: (ideaId: string) => void;
   onDelete?: (ideaId: string) => void;
-  onEdit?: (idea: any) => void; // 수정 핸들러 추가
+  onEdit?: (idea: any) => void;
+  onStatusChange?: (ideaId: string, newStatus: string) => void;
   isLiked?: boolean;
 }
 
@@ -57,7 +59,7 @@ const statusLabels: any = {
   rejected: '보류',
 };
 
-export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, onEdit, isLiked = false }: IdeaCardProps) {
+export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, onEdit, onStatusChange, isLiked = false }: IdeaCardProps) {
   const [showFullContent, setShowFullContent] = useState(false);
   
   const shortContent = idea.content.length > 150 
@@ -117,13 +119,30 @@ export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, onEdit, 
                 </DropdownMenuItem>
               )}
               
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                const url = `${window.location.origin}/ideas?id=${idea.id}`;
+                navigator.clipboard.writeText(url);
+                toast.success('링크가 복사되었습니다');
+              }}>
                 <LinkIcon className="mr-2 h-4 w-4" />
                 링크 복사
               </DropdownMenuItem>
-              
+
+              {onStatusChange && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">상태 변경</DropdownMenuLabel>
+                  {(['proposed', 'discussing', 'approved', 'implemented'] as const).filter(s => s !== idea.status).map(s => (
+                    <DropdownMenuItem key={s} onClick={() => onStatusChange(idea.id, s)}>
+                      <Badge className={`${statusColors[s]} mr-2`} variant="secondary">{statusLabels[s]}</Badge>
+                      으로 변경
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+
               {onDelete && (
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => onDelete(idea.id)}
                   className="text-red-600 focus:text-red-600"
                 >

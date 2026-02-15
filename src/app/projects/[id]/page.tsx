@@ -41,20 +41,30 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Share2, Database, Plus, Loader2, StickyNote } from 'lucide-react';
-import { 
-  addComment, 
-  addResource, 
-  createIdea, 
-  createMemo, 
-  updateMemo, 
+import {
+  addComment,
+  addResource,
+  deleteComment,
+  updateComment,
+  deleteResource,
+  createIdea,
+  createMemo,
+  updateMemo,
   deleteMemo,
   deleteIdea,
   connectIdeas,
   getComments,
   getResources,
   getEvolvedIdeas,
-  updateIdea 
+  updateIdea,
+  logActivity,
 } from '@/lib/firestore-helpers';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DBInitializer } from '@/components/db-initializer';
 import toast from 'react-hot-toast';
 
@@ -245,15 +255,15 @@ export default function ProjectCanvasPage() {
     await updateMemo(memoId, { content });
   };
 
-  const handleAddMemo = async () => {
+  const handleAddMemo = async (color: string = 'yellow') => {
     if (!user) return;
     const centerX = 200 + Math.random() * 100;
     const centerY = 200 + Math.random() * 100;
-    
+
     await createMemo({
       projectId: projectId as string,
       content: '',
-      color: 'yellow',
+      color,
       position: { x: centerX, y: centerY },
       authorId: user.uid,
     });
@@ -355,6 +365,61 @@ export default function ProjectCanvasPage() {
     setIsDetailOpen(false);
   };
 
+  const handleStatusChange = async (ideaId: string, newStatus: string) => {
+    if (!user) return;
+    try {
+      await updateIdea(ideaId, { status: newStatus });
+      await logActivity({
+        userId: user.uid,
+        userName: user.displayName || '익명',
+        actionType: 'status_changed',
+        entityType: 'idea',
+        entityId: ideaId,
+        metadata: { newStatus },
+      });
+      toast.success('상태가 변경되었습니다');
+      if (selectedIdea && selectedIdea.id === ideaId) {
+        fetchIdeaDetails({ ...selectedIdea, status: newStatus });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('상태 변경 실패');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedIdea) return;
+    try {
+      await deleteComment(selectedIdea.id, commentId);
+      toast.success('댓글이 삭제되었습니다');
+      fetchIdeaDetails(selectedIdea);
+    } catch (error) {
+      toast.error('댓글 삭제 실패');
+    }
+  };
+
+  const handleUpdateComment = async (commentId: string, content: string) => {
+    if (!selectedIdea) return;
+    try {
+      await updateComment(selectedIdea.id, commentId, content);
+      toast.success('댓글이 수정되었습니다');
+      fetchIdeaDetails(selectedIdea);
+    } catch (error) {
+      toast.error('댓글 수정 실패');
+    }
+  };
+
+  const handleDeleteResource = async (resourceId: string) => {
+    if (!selectedIdea) return;
+    try {
+      await deleteResource(selectedIdea.id, resourceId);
+      toast.success('리소스가 삭제되었습니다');
+      fetchIdeaDetails(selectedIdea);
+    } catch (error) {
+      toast.error('리소스 삭제 실패');
+    }
+  };
+
   const handleCreateRootIdeaSubmit = async () => {
     if (!user || !rootTitle.trim()) {
       toast.error('제목을 입력해주세요.');
@@ -400,9 +465,26 @@ export default function ProjectCanvasPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handleAddMemo} className="gap-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border-yellow-200">
-            <StickyNote className="w-4 h-4" /> 메모
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border-yellow-200">
+                <StickyNote className="w-4 h-4" /> 메모
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {[
+                { color: 'yellow', label: '노란색', bg: 'bg-yellow-200' },
+                { color: 'blue', label: '파란색', bg: 'bg-blue-200' },
+                { color: 'green', label: '초록색', bg: 'bg-green-200' },
+                { color: 'red', label: '빨간색', bg: 'bg-red-200' },
+              ].map(opt => (
+                <DropdownMenuItem key={opt.color} onClick={() => handleAddMemo(opt.color)}>
+                  <div className={`w-3 h-3 rounded-full ${opt.bg} mr-2`} />
+                  {opt.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" onClick={() => setIsCreateRootOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> 아이디어
           </Button>
@@ -455,6 +537,11 @@ export default function ProjectCanvasPage() {
           onSubmitComment={handleSubmitComment}
           onUploadResource={handleUploadResource}
           onCreateEvolution={handleCreateEvolution}
+          onStatusChange={handleStatusChange}
+          onDeleteComment={handleDeleteComment}
+          onUpdateComment={handleUpdateComment}
+          onDeleteResource={handleDeleteResource}
+          currentUserId={user?.uid}
         />
       )}
 
