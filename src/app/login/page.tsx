@@ -25,14 +25,21 @@ function LoginContent() {
   const [user, authLoading] = useAuthState(auth);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  
+  // 리다이렉트 경로가 없으면 대시보드로
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
-  // 이미 로그인되어 있으면 리디렉션
+  // 이미 로그인된 상태라면 바로 이동
   useEffect(() => {
     if (user && !authLoading) {
-      router.push(redirect);
+      // 쿠키가 없는 경우 강제 설정
+      if (document.cookie.indexOf('session=true') === -1) {
+        document.cookie = `session=true; path=/; max-age=604800`;
+      }
+      // router.push 대신 window.location.href 사용 (가장 확실한 방법)
+      window.location.href = redirectUrl;
     }
-  }, [user, authLoading, router, redirect]);
+  }, [user, authLoading, redirectUrl]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,18 +54,20 @@ function LoginContent() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       
-      // 세션 쿠키 설정 (서버 사이드 확인용)
-      document.cookie = `session=true; path=/; max-age=604800`; // 7일
+      // 세션 쿠키 설정 (7일)
+      document.cookie = `session=true; path=/; max-age=604800`;
       
       toast.success('로그인 성공!');
-      router.push(redirect);
+      
+      // 페이지를 새로고침하며 이동하여 미들웨어가 쿠키를 확실히 인식하게 함
+      window.location.href = redirectUrl;
+      
     } catch (error: any) {
       console.error('Login error:', error);
       
-      // 에러 메시지 한글화
       let errorMessage = '로그인 실패';
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = '등록되지 않은 이메일입니다';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다';
       } else if (error.code === 'auth/wrong-password') {
         errorMessage = '비밀번호가 올바르지 않습니다';
       } else if (error.code === 'auth/invalid-email') {
@@ -68,15 +77,15 @@ function LoginContent() {
       }
       
       toast.error(errorMessage);
-    } finally {
       setLoading(false);
     }
   };
 
-  // 빠른 로그인 (개발용)
+  // ... (이하 렌더링 코드는 기존과 동일하게 유지) ...
+  // (기존 코드의 return 부분 그대로 사용)
+  
   const quickLogin = (userEmail: string) => {
     setEmail(userEmail);
-    // 실제 프로덕션에서는 제거
   };
 
   if (authLoading) {
@@ -134,32 +143,13 @@ function LoginContent() {
             </Button>
           </form>
           
-          {/* 개발용 빠른 로그인 */}
           {process.env.NODE_ENV === 'development' && (
             <div className="mt-6 pt-6 border-t">
               <p className="text-xs text-muted-foreground mb-2">빠른 로그인 (개발용)</p>
               <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => quickLogin('founder@koreaheung.com')}
-                >
-                  현서 (CEO)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => quickLogin('cto@koreaheung.com')}
-                >
-                  정한 (CTO)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => quickLogin('cpo@koreaheung.com')}
-                >
-                  정호 (CPO)
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => quickLogin('founder@koreaheung.com')}>현서 (CEO)</Button>
+                <Button variant="outline" size="sm" onClick={() => quickLogin('cto@koreaheung.com')}>정한 (CTO)</Button>
+                <Button variant="outline" size="sm" onClick={() => quickLogin('cpo@koreaheung.com')}>정호 (CPO)</Button>
               </div>
             </div>
           )}
@@ -172,14 +162,8 @@ function LoginContent() {
         </CardContent>
       </Card>
       
-      {/* 공개 홈으로 돌아가기 */}
       <div className="fixed bottom-4 left-4">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/')}
-        >
-          ← 홈으로
-        </Button>
+        <Button variant="ghost" onClick={() => router.push('/')}>← 홈으로</Button>
       </div>
     </div>
   );

@@ -7,8 +7,40 @@ import { Toaster } from "react-hot-toast";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { usePathname } from "next/navigation";
+import { Metadata } from "next";
 
 const inter = Inter({ subsets: ["latin"] });
+
+// 👇 메타데이터 추가
+export const metadata: Metadata = {
+  title: "이게 되네 (ItWorks)",
+  description: "아이디어를 현실로 만드는 곳",
+  openGraph: {
+    title: "이게 되네 (ItWorks)",
+    description: "아이디어를 현실로 만드는 곳",
+    url: "https://itworks-7c742.web.app", // 실제 배포 URL
+    siteName: "ItWorks",
+    images: [
+      {
+        url: "/og-image.png", // public 폴더에 이미지를 넣어주세요
+        width: 1200,
+        height: 630,
+        alt: "ItWorks Dashboard Preview",
+      },
+    ],
+    locale: "ko_KR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "이게 되네 (ItWorks)",
+    description: "아이디어를 현실로 만드는 팀 프로젝트 관리 시스템",
+    images: ["/og-image.png"], // 동일한 이미지 사용
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
 
 export default function RootLayout({
   children,

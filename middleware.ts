@@ -1,32 +1,18 @@
-// middleware.ts (프로젝트 루트)
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// 공개 라우트 (로그인 불필요)
 const PUBLIC_ROUTES = [
-  '/',
-  '/about',
-  '/businesses',
-  '/businesses/heunghan',
-  '/businesses/substract',
-  '/businesses/sensus',
-  '/team',
-  '/login',
+  '/', '/about', '/businesses', '/businesses/heunghan', 
+  '/businesses/substract', '/businesses/sensus', '/team', '/login',
 ];
 
-// 팀 전용 라우트 (로그인 필수)
 const PROTECTED_ROUTES = [
-  '/dashboard',
-  '/ideas',
-  '/projects',
-  '/profile',
-  '/settings',
+  '/dashboard', '/ideas', '/projects', '/profile', '/settings',
 ];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // 정적 파일 제외
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
@@ -36,27 +22,26 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // Firebase Auth 세션 체크
   const session = request.cookies.get('session');
   const isAuthenticated = !!session?.value;
   
-  // 팀 전용 라우트 접근 시 로그인 필요
-  const isProtectedRoute = PROTECTED_ROUTES.some(route => 
-    pathname.startsWith(route)
-  );
+  // 보호된 라우트 접근 시 로그인 필요
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
   
   if (isProtectedRoute && !isAuthenticated) {
-    // 로그인 페이지로 리디렉션
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
   
-  // 이미 로그인했는데 /login 접근 시 대시보드로
+  // 이미 로그인했는데 로그인 페이지 접근 시
   if (pathname === '/login' && isAuthenticated) {
+    // redirect 파라미터가 있으면 거기로, 없으면 대시보드로 이동
+    const redirectTarget = request.nextUrl.searchParams.get('redirect') || '/dashboard';
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = redirectTarget;
+    url.searchParams.delete('redirect');
     return NextResponse.redirect(url);
   }
   
@@ -64,13 +49,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

@@ -45,3 +45,5 @@ next-env.d.ts
 firebase-debug.log*
 .runtimeconfig.json
 firebase-debug.log
+
+public/og-image.png
