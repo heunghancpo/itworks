@@ -1,8 +1,7 @@
 'use client';
 
 import { Handle, Position, NodeResizer } from 'reactflow';
-import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Paperclip } from 'lucide-react';
+import { MessageSquare, Paperclip, Pencil } from 'lucide-react';
 
 const statusColors: any = {
   proposed: 'border-blue-300 bg-blue-50',
@@ -17,26 +16,36 @@ export default function IdeaNode({ data, selected }: any) {
 
   return (
     <>
-      <NodeResizer 
-        color="#6366f1" 
-        isVisible={selected} 
-        minWidth={200} 
+      <NodeResizer
+        color="#6366f1"
+        isVisible={selected}
+        minWidth={200}
         minHeight={100}
-        // 🚨 수정됨: 리사이즈 종료 시 DB 업데이트 함수 호출
         onResizeEnd={(_, params) => {
           if (data.onResize) {
             data.onResize(params.width, params.height);
           }
         }}
       />
-      
+
       <div className={`w-full h-full px-4 py-3 shadow-md rounded-xl bg-white border-2 transition-all hover:shadow-xl ${statusColors[status] || 'border-gray-200'}`}>
         <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400" />
-        
+
         <div className="flex flex-col gap-2 h-full">
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground font-medium truncate max-w-[80px]">{authorName}</span>
-            <div className={`w-2 h-2 rounded-full ${status === 'approved' ? 'bg-green-500' : 'bg-blue-500'}`} />
+            <div className="flex items-center gap-1">
+              {data.onEdit && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); data.onEdit(); }}
+                  className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  title="수정"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+              <div className={`w-2 h-2 rounded-full ${status === 'approved' ? 'bg-green-500' : status === 'discussing' ? 'bg-purple-500' : status === 'implemented' ? 'bg-gray-500' : 'bg-blue-500'}`} />
+            </div>
           </div>
 
           <div className="font-bold text-sm line-clamp-3 leading-tight flex-1">

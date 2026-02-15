@@ -1,7 +1,7 @@
 // src/components/idea-detail-dialog.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -27,10 +27,19 @@ import {
   Trash2,
   X,
   Check,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Timestamp } from 'firebase/firestore';
+import { updateIdea } from '@/lib/firestore-helpers'; // updateIdea 추가
+import dynamic from 'next/dynamic';
+
+// SSR 이슈 방지를 위해 dynamic import 사용
+const TiptapEditor = dynamic(() => import('@/components/editor/tiptap-editor'), {
+  ssr: false,
+  loading: () => <div className="h-40 bg-slate-50 animate-pulse rounded-md" />,
+});
 
 function getSafeDate(date: any) {
   if (!date) return new Date();
@@ -90,6 +99,18 @@ export function IdeaDetailDialog({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState('');
 
+  // 날짜 상태 추가
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // 아이디어가 변경될 때 날짜 상태 업데이트
+  useEffect(() => {
+    if (idea) {
+      setStartDate(idea.startDate || '');
+      setEndDate(idea.endDate || '');
+    }
+  }, [idea]);
+
   const handleSubmitComment = async () => {
     if (!commentContent.trim()) return;
     setIsSubmitting(true);
@@ -121,13 +142,28 @@ export function IdeaDetailDialog({
     setEvolutionContent('');
   };
 
+  // 날짜 변경 핸들러
+  const handleDateChange = async (type: 'start' | 'end', value: string) => {
+    if (type === 'start') setStartDate(value);
+    else setEndDate(value);
+
+    // 자동 저장
+    try {
+      await updateIdea(idea.id, {
+        [type === 'start' ? 'startDate' : 'endDate']: value
+      });
+    } catch (error) {
+      console.error('Date update failed', error);
+    }
+  };
+
   if (!idea) return null;
 
   const currentStatusIndex = statusFlow.indexOf(idea.status);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto overflow-x-hidden w-[calc(100vw-24px)] sm:w-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
             <DialogTitle className="text-2xl font-bold leading-tight">{idea.title}</DialogTitle>
@@ -147,10 +183,46 @@ export function IdeaDetailDialog({
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
-          <div className="bg-slate-50 p-4 rounded-lg border">
-            <p className="text-sm whitespace-pre-wrap leading-relaxed text-slate-700">
-              {idea.content}
-            </p>
+          
+          {/* 기간 설정 섹션 */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 border rounded-lg">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3" /> 시작일
+              </label>
+              <Input 
+                type="date" 
+                value={startDate} 
+                onChange={(e) => handleDateChange('start', e.target.value)}
+                className="bg-white h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3" /> 종료일 (마감)
+              </label>
+              <Input 
+                type="date" 
+                value={endDate} 
+                onChange={(e) => handleDateChange('end', e.target.value)}
+                className="bg-white h-9 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* 에디터 뷰어 */}
+          <div className="border rounded-md p-4 bg-white min-h-[100px]">
+            {idea.content && idea.content.startsWith('<') ? (
+              <TiptapEditor 
+                content={idea.content} 
+                editable={false} 
+                className="border-none shadow-none" 
+              />
+            ) : (
+              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                {idea.content}
+              </p>
+            )}
           </div>
 
           {idea.tags && idea.tags.length > 0 && (
@@ -163,7 +235,7 @@ export function IdeaDetailDialog({
 
           {/* Status Workflow */}
           {onStatusChange && (
-            <div className="flex items-center gap-1.5 p-3 bg-slate-50 rounded-lg border">
+            <div className="flex items-center gap-1.5 p-3 bg-slate-50 rounded-lg border overflow-x-auto">
               <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">상태:</span>
               {statusFlow.map((s, idx) => {
                 const isActive = s === idea.status;
@@ -202,7 +274,7 @@ export function IdeaDetailDialog({
 
             {/* Discussion Tab */}
             <TabsContent value="discussion" className="space-y-4 mt-4">
-              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {idea.comments?.map((comment: any) => {
                   const authorName = comment.authorName || comment.author?.name || '익명';
                   const authorAvatar = comment.authorAvatar || comment.author?.avatar;

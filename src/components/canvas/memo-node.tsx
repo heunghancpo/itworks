@@ -26,44 +26,43 @@ export default function MemoNode({ data, id, selected }: any) {
 
   return (
     <>
-      <NodeResizer 
-        color="#fbbf24" 
-        isVisible={selected} 
-        minWidth={150} 
-        minHeight={150}
-        // 🚨 수정됨: 리사이즈 종료 시 DB 업데이트 함수 호출
+      <NodeResizer
+        color="#fbbf24"
+        isVisible={selected}
+        minWidth={150}
+        minHeight={100}
         onResizeEnd={(_, params) => {
           if (data.onResize) {
             data.onResize(params.width, params.height);
           }
         }}
       />
-      
-      <div 
-        className={`w-full h-full p-4 shadow-sm rounded-lg border transition-all flex flex-col
-          ${colors[data.color || 'yellow']} 
+
+      <div
+        className={`w-full h-full p-3 shadow-sm rounded-lg border transition-all flex flex-col
+          ${colors[data.color || 'yellow']}
           ${selected ? 'shadow-md' : ''}`}
       >
         <Handle type="target" position={Position.Top} className="opacity-0" />
-        
-        <button 
+
+        <button
           onClick={(e) => {
             e.stopPropagation();
             data.onDelete?.(id);
           }}
-          className="absolute top-2 right-2 p-1 text-black/20 hover:text-black/60 transition-colors z-10"
+          className="absolute top-1.5 right-1.5 p-0.5 text-black/20 hover:text-black/60 transition-colors z-10"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
 
         <textarea
-          className="w-full h-full bg-transparent border-none resize-none focus:outline-none text-sm font-medium leading-relaxed font-sans"
+          className="w-full h-full bg-transparent border-none resize-none focus:outline-none text-sm font-medium leading-relaxed font-sans nodrag nopan"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onBlur={handleBlur}
           placeholder="메모를 입력하세요..."
         />
-        
+
         <Handle type="source" position={Position.Bottom} className="opacity-0" />
       </div>
     </>

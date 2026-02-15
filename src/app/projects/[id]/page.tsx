@@ -40,7 +40,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Share2, Database, Plus, Loader2, StickyNote } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, StickyNote, Pencil } from 'lucide-react';
 import {
   addComment,
   addResource,
@@ -65,8 +65,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { DBInitializer } from '@/components/db-initializer';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
+
+const TiptapEditor = dynamic(() => import('@/components/editor/tiptap-editor'), {
+  ssr: false,
+  loading: () => <div className="h-40 bg-slate-50 animate-pulse rounded-md" />,
+});
 
 const nodeTypes = {
   ideaNode: IdeaNode,
@@ -123,6 +136,14 @@ export default function ProjectCanvasPage() {
   const [rootContent, setRootContent] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // 아이디어 수정
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<any>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editPriority, setEditPriority] = useState('medium');
+  const [editTags, setEditTags] = useState('');
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
     [setNodes]
@@ -175,8 +196,8 @@ export default function ProjectCanvasPage() {
           name: idea.authorName,
           avatar: idea.authorAvatar
         },
-        // 🚨 리사이즈 핸들러 전달 (data를 통해 Node로 전달)
-        onResize: (width: number, height: number) => updateIdea(idea.id, { width, height })
+        onResize: (width: number, height: number) => updateIdea(idea.id, { width, height }),
+        onEdit: () => handleEditIdea(idea),
       },
       position: idea.position || { x: 0, y: 0 },
       style: idea.width && idea.height ? { width: idea.width, height: idea.height } : undefined,
@@ -222,7 +243,12 @@ export default function ProjectCanvasPage() {
       hierEdges
     );
 
-    setNodes([...layoutedIdeaNodes, ...memoNodes]);
+    // 선택 상태 유지: 기존 노드의 selected를 보존
+    setNodes((prevNodes) => {
+      const selectedIds = new Set(prevNodes.filter(n => n.selected).map(n => n.id));
+      const allNew = [...layoutedIdeaNodes, ...memoNodes];
+      return allNew.map(n => selectedIds.has(n.id) ? { ...n, selected: true } : n);
+    });
     setEdges([...layoutedEdges, ...customEdges]);
   };
 
@@ -286,10 +312,35 @@ export default function ProjectCanvasPage() {
     []
   );
 
-  const onNodeClick = (_: any, node: any) => {
+  const onNodeDoubleClick = (_: any, node: any) => {
     if (node.type === 'ideaNode') {
       fetchIdeaDetails(node.data);
       setIsDetailOpen(true);
+    }
+  };
+
+  const handleEditIdea = (idea: any) => {
+    setEditingIdea(idea);
+    setEditTitle(idea.title);
+    setEditContent(idea.content || '');
+    setEditPriority(idea.priority || 'medium');
+    setEditTags(idea.tags?.join(', ') || '');
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEditIdea = async () => {
+    if (!editingIdea || !editTitle) return;
+    try {
+      await updateIdea(editingIdea.id, {
+        title: editTitle,
+        content: editContent,
+        priority: editPriority,
+        tags: editTags.split(',').map((t: string) => t.trim()).filter(Boolean),
+      });
+      toast.success('아이디어가 수정되었습니다');
+      setIsEditOpen(false);
+    } catch (error) {
+      toast.error('수정 실패');
     }
   };
 
@@ -449,26 +500,25 @@ export default function ProjectCanvasPage() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col bg-slate-50">
-      <div className="h-16 border-b bg-white flex items-center px-6 justify-between z-10 shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/projects')}>
-            <ArrowLeft className="w-5 h-5" />
+    <div className="h-[calc(100vh-56px)] lg:h-screen w-full flex flex-col bg-slate-50 overflow-hidden">
+      <div className="min-h-[56px] border-b bg-white flex items-center px-3 sm:px-6 justify-between z-10 shadow-sm gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 shrink">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 sm:h-9 sm:w-9" onClick={() => router.push('/projects')}>
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
-          <div>
-            <h1 className="font-bold text-lg flex items-center gap-2">
-              {project?.title || 'Loading...'}
-              <span className="text-xs font-normal text-muted-foreground px-2 py-0.5 bg-slate-100 rounded-full border">
-                Canvas View
-              </span>
-            </h1>
-          </div>
+          <h1 className="font-bold text-sm sm:text-lg truncate min-w-0">
+            {project?.title || 'Loading...'}
+          </h1>
+          <span className="hidden sm:inline text-xs font-normal text-muted-foreground px-2 py-0.5 bg-slate-100 rounded-full border whitespace-nowrap shrink-0">
+            Canvas
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="gap-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border-yellow-200">
-                <StickyNote className="w-4 h-4" /> 메모
+              <Button size="sm" variant="outline" className="h-8 px-2 sm:px-3 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border-yellow-200">
+                <StickyNote className="w-4 h-4" />
+                <span className="hidden sm:inline ml-1.5">메모</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -485,13 +535,11 @@ export default function ProjectCanvasPage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={() => setIsCreateRootOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> 아이디어
+          <Button size="sm" className="h-8 px-2 sm:px-3" onClick={() => setIsCreateRootOpen(true)}>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline ml-1.5">아이디어</span>
           </Button>
           <DBInitializer />
-          <Button size="sm" variant="outline">
-            <Share2 className="w-4 h-4 mr-2" /> 공유
-          </Button>
         </div>
       </div>
 
@@ -506,7 +554,7 @@ export default function ProjectCanvasPage() {
           // 🚨 수정됨: onNodeResizeStop 제거 (노드 내부에서 처리)
           onNodesDelete={onNodesDelete}
           nodeTypes={nodeTypes}
-          onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
           connectionLineType={ConnectionLineType.SmoothStep}
           fitView
           minZoom={0.1}
@@ -591,6 +639,59 @@ export default function ProjectCanvasPage() {
               아이디어 등록
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 아이디어 수정 다이얼로그 */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-4xl w-[calc(100vw-32px)] max-h-[90vh] overflow-y-auto overflow-x-hidden">
+          <DialogHeader>
+            <DialogTitle>아이디어 수정</DialogTitle>
+            <DialogDescription>아이디어 내용을 수정하세요</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-medium">제목</label>
+              <Input
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div className="min-w-0">
+              <label className="text-sm font-medium mb-1 block">내용</label>
+              <TiptapEditor
+                content={editContent}
+                onChange={setEditContent}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">우선순위</label>
+                <Select value={editPriority} onValueChange={setEditPriority}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">낮음</SelectItem>
+                    <SelectItem value="medium">보통</SelectItem>
+                    <SelectItem value="high">높음</SelectItem>
+                    <SelectItem value="urgent">긴급</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">태그 (쉼표로 구분)</label>
+                <Input
+                  value={editTags}
+                  onChange={e => setEditTags(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>취소</Button>
+              <Button onClick={handleSaveEditIdea}>수정 완료</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

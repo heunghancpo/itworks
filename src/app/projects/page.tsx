@@ -286,19 +286,19 @@ export default function ProjectsPage() {
   );
 
   return (
-    <div className="container mx-auto p-6 min-h-screen">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 min-h-screen overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <LayoutGrid className="h-8 w-8 text-indigo-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <LayoutGrid className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600" />
             프로젝트
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base hidden sm:block">
             진행 중인 모든 프로젝트의 현황과 아이디어를 한눈에 확인하세요.
           </p>
         </div>
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> 새 프로젝트
+        <Button size="sm" className="sm:size-default self-start sm:self-auto" onClick={() => { resetForm(); setIsCreateOpen(true); }}>
+          <Plus className="mr-1 sm:mr-2 h-4 w-4" /> 새 프로젝트
         </Button>
       </div>
 

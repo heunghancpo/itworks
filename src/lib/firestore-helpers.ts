@@ -37,8 +37,10 @@ export async function createIdea(data: {
   authorName: string;
   authorAvatar?: string;
   parentId?: string;
-  // ✨ 위치 정보 추가 (선택)
   position?: { x: number; y: number };
+  // ✨ 날짜 필드 추가
+  startDate?: string;
+  endDate?: string;
 }) {
   return await addDoc(ideasCollection, {
     ...data,
@@ -46,11 +48,11 @@ export async function createIdea(data: {
     likesCount: 0,
     commentsCount: 0,
     resourcesCount: 0,
-    // ✨ 위치 정보가 없으면 기본값(0,0) 저장 (나중에 캔버스에서 레이아웃 처리)
     position: data.position || { x: 0, y: 0 },
-    // ✨ 기본 크기 저장 (선택)
     width: 280, 
-    // height는 내용에 따라 가변적이므로 초기엔 저장하지 않거나 auto로 둠
+    // ✨ 날짜 필드 저장 (없으면 null)
+    startDate: data.startDate || null,
+    endDate: data.endDate || null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -447,4 +449,60 @@ export async function getConnections(projectId: string) {
   const q = query(collection(db, 'connections'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+// ============================================
+// Notifications 관련 함수
+// ============================================
+
+export async function createNotification(data: {
+  userId: string;
+  type: string; // 'comment' | 'status_change' | 'mention' | 'idea_created'
+  title: string;
+  message: string;
+  link?: string;
+  fromUserId?: string;
+  fromUserName?: string;
+}) {
+  return await addDoc(collection(db, 'notifications'), {
+    ...data,
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export function subscribeToNotifications(userId: string, callback: (notifications: any[]) => void) {
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc'),
+    limit(20)
+  );
+  return onSnapshot(q, (snapshot) => {
+    const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(notifs);
+  });
+}
+
+export async function markNotificationRead(notificationId: string) {
+  await updateDoc(doc(db, 'notifications', notificationId), { read: true });
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    where('read', '==', false)
+  );
+  const snapshot = await getDocs(q);
+  const updates = snapshot.docs.map(d => updateDoc(doc(db, 'notifications', d.id), { read: true }));
+  await Promise.all(updates);
+}
+
+// 팀원 전체에게 알림 보내기 (본인 제외)
+const TEAM_MEMBERS = ['hyunseo', 'jungho', 'junghan'];
+
+export async function notifyTeam(excludeUserId: string, data: Omit<Parameters<typeof createNotification>[0], 'userId'>) {
+  const targets = TEAM_MEMBERS.filter(id => id !== excludeUserId);
+  await Promise.all(targets.map(userId => createNotification({ ...data, userId })));
 }
