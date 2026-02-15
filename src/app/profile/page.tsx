@@ -81,7 +81,7 @@ export default function ProfilePage() {
   const getRoleFromEmail = (email: string): string => {
     if (email.includes('ceo')) return 'CEO';
     if (email.includes('cso')) return 'CSO';
-    if (email.includes('cpo') || email.includes('cto')) return 'CPO';
+    if (email.includes('cto') || email.includes('cto')) return 'CTO';
     return '';
   };
 
@@ -254,7 +254,7 @@ export default function ProfilePage() {
                     <Input
                       value={editedProfile.role}
                       onChange={(e) => setEditedProfile({ ...editedProfile, role: e.target.value })}
-                      placeholder="CEO, CSO, CPO 등"
+                      placeholder="CEO, CSO, CTO 등"
                     />
                   </div>
 

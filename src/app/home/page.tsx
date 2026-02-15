@@ -189,7 +189,7 @@ export default function HomePage() {
               한
             </div>
             <h3 className="font-bold mb-1">이정한</h3>
-            <p className="text-sm text-muted-foreground mb-2">CPO</p>
+            <p className="text-sm text-muted-foreground mb-2">CTO</p>
             <p className="text-xs text-muted-foreground">
               풀스택 개발, AI/ML, 제품 제작
             </p>

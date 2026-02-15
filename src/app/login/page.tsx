@@ -97,7 +97,7 @@ export default function LoginPage() {
               <label className="text-sm font-medium">이메일</label>
               <Input
                 type="email"
-                placeholder="cpo@koreaheung.com"
+                placeholder="cto@koreaheung.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
@@ -134,9 +134,16 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => quickLogin('cpo@koreaheung.com')}
+                  onClick={() => quickLogin('ceo@koreaheung.com')}
                 >
-                  정한 (CPO)
+                  현서 (CEO)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => quickLogin('cto@koreaheung.com')}
+                >
+                  정한 (CTO)
                 </Button>
                 <Button
                   variant="outline"
@@ -144,13 +151,6 @@ export default function LoginPage() {
                   onClick={() => quickLogin('cso@koreaheung.com')}
                 >
                   정호 (CSO)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => quickLogin('ceo@koreaheung.com')}
-                >
-                  현서 (CEO)
                 </Button>
               </div>
             </div>
