@@ -61,7 +61,7 @@ function ToolBtn({
 }
 
 function Divider() {
-  return <div className="w-px h-5 bg-slate-200 mx-0.5 shrink-0" />;
+  return <div className="hidden sm:block w-px h-5 bg-slate-200 mx-0.5 shrink-0" />;
 }
 
 // 툴바
@@ -91,9 +91,9 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
   const iconSize = 'h-3.5 w-3.5';
 
   return (
-    <div className="border-b bg-slate-50/80 rounded-t-md sticky top-0 z-10 max-w-full overflow-hidden">
-      {/* 메인 툴바 - 스크롤 가능 */}
-      <div className="flex items-center gap-0.5 p-1.5 overflow-x-auto scrollbar-hide max-w-full">
+    <div className="border-b bg-slate-50/80 rounded-t-md sticky top-0 z-10">
+      {/* 메인 툴바 - 모바일에서 줄바꿈, PC에서 한 줄 */}
+      <div className="flex flex-wrap items-center gap-0.5 p-1.5">
         {/* 실행 취소/다시 실행 */}
         <ToolBtn onClick={() => editor.chain().focus().undo().run()} tooltip="실행 취소 (Ctrl+Z)">
           <Undo2 className={iconSize} />
@@ -279,7 +279,7 @@ export default function TiptapEditor({
   }
 
   return (
-    <div className={`border rounded-md w-full overflow-hidden bg-white shadow-sm max-w-full ${className || ''}`}>
+    <div className={`border rounded-md w-full bg-white shadow-sm max-w-full ${className || ''}`}>
       {editable && <EditorToolbar editor={editor} />}
 
 
@@ -307,7 +307,8 @@ export default function TiptapEditor({
         .ProseMirror hr { border: none; border-top: 2px solid #e2e8f0; margin: 1em 0; }
         .ProseMirror mark { background-color: #fef08a; padding: 0.1em 0.2em; border-radius: 0.15em; }
         .ProseMirror img { max-width: 100%; height: auto; border-radius: 0.5em; margin: 0.5em 0; }
-        .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.5em 0; overflow: hidden; table-layout: fixed; }
+        .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.5em 0; overflow-x: auto; display: block; table-layout: fixed; }
+        @media (min-width: 640px) { .ProseMirror table { display: table; } }
         .ProseMirror table td, .ProseMirror table th { border: 1px solid #e2e8f0; padding: 0.4em 0.6em; min-width: 80px; vertical-align: top; }
         .ProseMirror table th { background-color: #f8fafc; font-weight: 600; text-align: left; }
         .ProseMirror table .selectedCell { background-color: #eef2ff; }
