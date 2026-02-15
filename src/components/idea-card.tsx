@@ -1,3 +1,4 @@
+// src/components/idea-card.tsx
 'use client';
 
 import { useState } from 'react';
@@ -12,51 +13,35 @@ import {
   MoreVertical,
   TrendingUp,
   Clock,
-  User
+  Pencil,
+  Trash2,
+  Link as LinkIcon
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { Timestamp } from 'firebase/firestore';
 
-interface Idea {
-  id: string;
-  title: string;
-  content: string;
-  status: 'proposed' | 'discussing' | 'approved' | 'implemented' | 'rejected';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  tags: string[];
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  author: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-  project: {
-    title: string;
-    business: {
-      name: string;
-      color: string;
-    };
-  };
-  parent_idea?: {
-    id: string;
-    title: string;
-  };
-  resources_count?: number;
+// 날짜 변환 헬퍼 (중복 방지를 위해 유틸로 빼는 것이 좋으나, 편의상 여기에 포함)
+function getSafeDate(date: any) {
+  if (!date) return new Date();
+  if (date instanceof Timestamp || (date && typeof date.toDate === 'function')) {
+    return date.toDate();
+  }
+  return new Date(date);
 }
 
 interface IdeaCardProps {
-  idea: Idea;
+  idea: any;
   onLike: (ideaId: string) => void;
   onComment: (ideaId: string) => void;
   onEvolve: (ideaId: string) => void;
   onDelete?: (ideaId: string) => void;
+  onEdit?: (idea: any) => void; // 수정 핸들러 추가
   isLiked?: boolean;
 }
 
-const statusColors = {
+const statusColors: any = {
   proposed: 'bg-blue-100 text-blue-800',
   discussing: 'bg-purple-100 text-purple-800',
   approved: 'bg-green-100 text-green-800',
@@ -64,7 +49,7 @@ const statusColors = {
   rejected: 'bg-red-100 text-red-800',
 };
 
-const statusLabels = {
+const statusLabels: any = {
   proposed: '제안',
   discussing: '논의중',
   approved: '승인',
@@ -72,78 +57,77 @@ const statusLabels = {
   rejected: '보류',
 };
 
-const priorityColors = {
-  low: 'bg-gray-100 text-gray-600',
-  medium: 'bg-blue-100 text-blue-600',
-  high: 'bg-orange-100 text-orange-600',
-  urgent: 'bg-red-100 text-red-600',
-};
-
-const priorityLabels = {
-  low: '낮음',
-  medium: '보통',
-  high: '높음',
-  urgent: '긴급',
-};
-
-export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, isLiked = false }: IdeaCardProps) {
+export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, onEdit, isLiked = false }: IdeaCardProps) {
   const [showFullContent, setShowFullContent] = useState(false);
   
   const shortContent = idea.content.length > 150 
     ? idea.content.substring(0, 150) + '...' 
     : idea.content;
 
+  // 프로젝트 정보 안전하게 접근
+  const projectTitle = idea.project?.title || '';
+  const businessName = idea.project?.business?.name || '';
+  const businessColor = idea.project?.business?.color || '#000000';
+
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200">
+    <Card className="hover:shadow-lg transition-shadow duration-200 flex flex-col h-full">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            {/* 부모 아이디어 표시 (발전된 아이디어인 경우) */}
-            {idea.parent_idea && (
-              <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+            {idea.parentId && (
+              <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground bg-slate-50 w-fit px-2 py-1 rounded">
                 <TrendingUp className="h-3 w-3" />
-                <span>
-                  <span className="font-medium">{idea.parent_idea.title}</span>에서 발전됨
-                </span>
+                <span>발전된 아이디어</span>
               </div>
             )}
             
-            <CardTitle className="text-lg font-semibold leading-tight">
+            <CardTitle className="text-lg font-bold leading-tight">
               {idea.title}
             </CardTitle>
             
-            <CardDescription className="flex items-center gap-2 mt-2">
+            <CardDescription className="flex items-center gap-2 mt-2 text-xs">
               <Avatar className="h-5 w-5">
-                <AvatarImage src={idea.author.avatar} />
-                <AvatarFallback>{idea.author.name[0]}</AvatarFallback>
+                <AvatarImage src={idea.author?.avatar} />
+                <AvatarFallback>{idea.author?.name?.[0] || '?'}</AvatarFallback>
               </Avatar>
-              <span>{idea.author.name}</span>
+              <span>{idea.author?.name || '익명'}</span>
               <span>•</span>
               <Clock className="h-3 w-3" />
-              <span>{formatDistanceToNow(new Date(idea.created_at), { addSuffix: true, locale: ko })}</span>
+              {/* 🚨 날짜 오류 수정 적용 */}
+              <span>{formatDistanceToNow(getSafeDate(idea.createdAt), { addSuffix: true, locale: ko })}</span>
             </CardDescription>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onEvolve(idea.id)}>
                 <TrendingUp className="mr-2 h-4 w-4" />
-                이 아이디어 발전시키기
+                발전시키기 (Evolve)
               </DropdownMenuItem>
+              
+              {onEdit && (
+                <DropdownMenuItem onClick={() => onEdit(idea)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  수정
+                </DropdownMenuItem>
+              )}
+              
               <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                태스크로 전환
+                <LinkIcon className="mr-2 h-4 w-4" />
+                링크 복사
               </DropdownMenuItem>
+              
               {onDelete && (
                 <DropdownMenuItem 
                   onClick={() => onDelete(idea.id)}
-                  className="text-red-600"
+                  className="text-red-600 focus:text-red-600"
                 >
+                  <Trash2 className="mr-2 h-4 w-4" />
                   삭제
                 </DropdownMenuItem>
               )}
@@ -151,43 +135,34 @@ export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, isLiked 
           </DropdownMenu>
         </div>
 
-        {/* 태그 & 상태 */}
         <div className="flex flex-wrap items-center gap-2 mt-3">
-          <Badge 
-            className={statusColors[idea.status]}
-            variant="secondary"
-          >
-            {statusLabels[idea.status]}
+          <Badge className={statusColors[idea.status] || 'bg-slate-100'} variant="secondary">
+            {statusLabels[idea.status] || idea.status}
           </Badge>
           
-          <Badge 
-            className={priorityColors[idea.priority]}
-            variant="secondary"
-          >
-            {priorityLabels[idea.priority]}
-          </Badge>
+          {businessName && (
+            <Badge 
+              style={{ 
+                backgroundColor: `${businessColor}15`,
+                color: businessColor,
+                borderColor: `${businessColor}40`
+              }}
+              variant="outline"
+            >
+              {businessName}
+            </Badge>
+          )}
 
-          <Badge 
-            style={{ 
-              backgroundColor: `${idea.project.business.color}20`,
-              color: idea.project.business.color,
-              borderColor: idea.project.business.color
-            }}
-            variant="outline"
-          >
-            {idea.project.business.name}
-          </Badge>
-
-          {idea.tags.map((tag) => (
-            <Badge key={tag} variant="outline" className="text-xs">
+          {idea.tags?.map((tag: string) => (
+            <Badge key={tag} variant="outline" className="text-xs font-normal">
               #{tag}
             </Badge>
           ))}
         </div>
       </CardHeader>
 
-      <CardContent className="pb-3">
-        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+      <CardContent className="pb-3 flex-1">
+        <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
           {showFullContent ? idea.content : shortContent}
         </p>
         
@@ -195,58 +170,42 @@ export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, isLiked 
           <Button
             variant="link"
             size="sm"
-            className="px-0 h-auto mt-1"
+            className="px-0 h-auto mt-1 text-slate-400"
             onClick={() => setShowFullContent(!showFullContent)}
           >
             {showFullContent ? '접기' : '더 보기'}
           </Button>
         )}
-        
-        {/* 프로젝트 정보 */}
-        <div className="mt-3 text-xs text-muted-foreground">
-          프로젝트: <span className="font-medium">{idea.project.title}</span>
-        </div>
       </CardContent>
 
-      <CardFooter className="pt-3 border-t">
+      <CardFooter className="pt-3 border-t bg-slate-50/50">
         <div className="flex items-center gap-2 w-full">
           <Button
-            variant={isLiked ? "default" : "ghost"}
+            variant={isLiked ? "secondary" : "ghost"}
             size="sm"
-            className="gap-2"
+            className={`gap-1.5 h-8 ${isLiked ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500'}`}
             onClick={() => onLike(idea.id)}
           >
-            <ThumbsUp className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
-            <span>{idea.likes_count}</span>
+            <ThumbsUp className={`h-3.5 w-3.5 ${isLiked ? 'fill-current' : ''}`} />
+            <span className="text-xs">{idea.likesCount || 0}</span>
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2"
+            className="gap-1.5 h-8 text-slate-500"
             onClick={() => onComment(idea.id)}
           >
-            <MessageSquare className="h-4 w-4" />
-            <span>{idea.comments_count}</span>
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span className="text-xs">{idea.commentsCount || 0}</span>
           </Button>
 
-          {idea.resources_count && idea.resources_count > 0 && (
-            <Button variant="ghost" size="sm" className="gap-2">
-              <Paperclip className="h-4 w-4" />
-              <span>{idea.resources_count}</span>
+          {idea.resourcesCount > 0 && (
+            <Button variant="ghost" size="sm" className="gap-1.5 h-8 text-slate-500">
+              <Paperclip className="h-3.5 w-3.5" />
+              <span className="text-xs">{idea.resourcesCount}</span>
             </Button>
           )}
-          
-          <div className="ml-auto">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => onEvolve(idea.id)}
-            >
-              <TrendingUp className="h-4 w-4 mr-1" />
-              발전시키기
-            </Button>
-          </div>
         </div>
       </CardFooter>
     </Card>

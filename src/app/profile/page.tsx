@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { updateProfile, updateEmail } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { updateProfile, verifyBeforeUpdateEmail } from 'firebase/auth'; // 🚨 변경됨
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,7 +61,6 @@ export default function ProfilePage() {
         setProfile(profileData);
         setEditedProfile(profileData);
       } else {
-        // 프로필이 없으면 생성
         const newProfile = {
           name: user.displayName || '',
           email: user.email || '',
@@ -79,9 +78,9 @@ export default function ProfilePage() {
   };
 
   const getRoleFromEmail = (email: string): string => {
-    if (email.includes('ceo')) return 'CEO';
-    if (email.includes('cso')) return 'CSO';
-    if (email.includes('cto') || email.includes('cto')) return 'CTO';
+    if (email.includes('founder')) return 'CEO';
+    if (email.includes('cpo')) return 'CPO';
+    if (email.includes('cto')) return 'CTO';
     return '';
   };
 
@@ -89,41 +88,63 @@ export default function ProfilePage() {
     if (!user) return;
     
     setSaving(true);
+    let emailVerificationSent = false;
     
     try {
-      // Firestore 업데이트
-      await updateDoc(doc(db, 'users', user.uid), {
-        name: editedProfile.name,
-        bio: editedProfile.bio,
-        role: editedProfile.role,
-        updatedAt: serverTimestamp(),
-      });
-      
-      // Firebase Auth 프로필 업데이트
-      await updateProfile(user, {
-        displayName: editedProfile.name,
-      });
-      
-      // 이메일 변경 (다른 경우에만)
+      // 1. 이메일 변경 시도 (verifyBeforeUpdateEmail 사용)
       if (editedProfile.email !== user.email) {
         try {
-          await updateEmail(user, editedProfile.email);
-          toast.success('이메일이 변경되었습니다. 다시 로그인해주세요.');
+          await verifyBeforeUpdateEmail(user, editedProfile.email);
+          emailVerificationSent = true;
+          toast.success('새 이메일로 인증 링크를 보냈습니다. 인증 후 변경됩니다.');
         } catch (error: any) {
           if (error.code === 'auth/requires-recent-login') {
             toast.error('보안을 위해 다시 로그인 후 이메일을 변경해주세요');
-          } else {
-            throw error;
+            setSaving(false);
+            return;
           }
+          throw error; // 그 외 에러는 하단 catch로 전달
         }
       }
+
+      // 2. Firestore 저장
+      // 주의: 이메일은 인증 전까지 변경되지 않으므로, Firestore에도 기존 이메일을 유지하는 것이 안전합니다.
+      const firestoreData = {
+        name: editedProfile.name,
+        bio: editedProfile.bio,
+        role: editedProfile.role,
+        // 이메일 변경 요청이 있었다면(인증 대기 중) DB 업데이트에서 제외하거나 기존 값 유지
+        email: emailVerificationSent ? user.email : editedProfile.email,
+        updatedAt: serverTimestamp(),
+      };
+
+      await setDoc(doc(db, 'users', user.uid), firestoreData, { merge: true });
       
-      setProfile(editedProfile);
+      // 3. Auth 프로필(이름) 업데이트
+      if (editedProfile.name !== user.displayName) {
+        await updateProfile(user, {
+          displayName: editedProfile.name,
+        });
+      }
+      
+      // UI 업데이트
+      // 이메일은 아직 안 바뀌었으므로 기존 이메일로 되돌려서 보여줌
+      const updatedProfileState = {
+        ...editedProfile,
+        email: user.email || '', 
+      };
+      
+      setProfile(updatedProfileState);
+      setEditedProfile(updatedProfileState);
       setIsEditing(false);
-      toast.success('프로필이 업데이트되었습니다');
-    } catch (error) {
+      
+      if (!emailVerificationSent) {
+        toast.success('프로필이 업데이트되었습니다');
+      }
+
+    } catch (error: any) {
       console.error('Error saving profile:', error);
-      toast.error('프로필 저장 실패');
+      toast.error(`저장 실패: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -134,94 +155,58 @@ export default function ProfilePage() {
     setIsEditing(false);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">로딩 중...</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center">로딩 중...</div>;
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold">마이페이지</h1>
-          <p className="text-muted-foreground mt-1">
-            프로필 정보를 관리하세요
-          </p>
+          <p className="text-muted-foreground mt-1">프로필 정보를 관리하세요</p>
         </div>
 
         <div className="grid gap-6">
-          {/* 프로필 카드 */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>프로필</CardTitle>
                 {!isEditing ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    수정
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                    <Edit2 className="h-4 w-4 mr-2" /> 수정
                   </Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancel}
-                      disabled={saving}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      취소
+                    <Button variant="outline" size="sm" onClick={handleCancel} disabled={saving}>
+                      <X className="h-4 w-4 mr-2" /> 취소
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSave}
-                      disabled={saving}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {saving ? '저장 중...' : '저장'}
+                    <Button size="sm" onClick={handleSave} disabled={saving}>
+                      <Save className="h-4 w-4 mr-2" /> {saving ? '저장 중...' : '저장'}
                     </Button>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* 아바타 */}
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={profile.avatar} />
-                  <AvatarFallback className="text-2xl">
-                    {profile.name[0] || '?'}
-                  </AvatarFallback>
+                  <AvatarFallback className="text-2xl">{profile.name[0] || '?'}</AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-semibold text-lg">{profile.name}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="secondary">{profile.role}</Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {profile.email}
-                    </span>
+                    <span className="text-sm text-muted-foreground">{profile.email}</span>
                   </div>
                 </div>
               </div>
 
-              {/* 수정 폼 */}
               {isEditing ? (
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium flex items-center gap-2 mb-2">
-                      <User className="h-4 w-4" />
-                      이름
+                      <User className="h-4 w-4" /> 이름
                     </label>
                     <Input
                       value={editedProfile.name}
@@ -229,11 +214,9 @@ export default function ProfilePage() {
                       placeholder="이름 입력"
                     />
                   </div>
-
                   <div>
                     <label className="text-sm font-medium flex items-center gap-2 mb-2">
-                      <Mail className="h-4 w-4" />
-                      이메일
+                      <Mail className="h-4 w-4" /> 이메일
                     </label>
                     <Input
                       type="email"
@@ -241,27 +224,22 @@ export default function ProfilePage() {
                       onChange={(e) => setEditedProfile({ ...editedProfile, email: e.target.value })}
                       placeholder="이메일 입력"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      이메일 변경 시 보안을 위해 다시 로그인이 필요합니다
+                    <p className="text-xs text-muted-foreground mt-1 text-orange-600">
+                      * 이메일 변경 시 인증 메일이 발송되며, 인증 후 변경이 완료됩니다.
                     </p>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium flex items-center gap-2 mb-2">
-                      <Briefcase className="h-4 w-4" />
-                      역할
+                      <Briefcase className="h-4 w-4" /> 역할
                     </label>
                     <Input
                       value={editedProfile.role}
                       onChange={(e) => setEditedProfile({ ...editedProfile, role: e.target.value })}
-                      placeholder="CEO, CSO, CTO 등"
+                      placeholder="CEO, CPO, CTO 등"
                     />
                   </div>
-
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      자기소개
-                    </label>
+                    <label className="text-sm font-medium mb-2 block">자기소개</label>
                     <Textarea
                       value={editedProfile.bio}
                       onChange={(e) => setEditedProfile({ ...editedProfile, bio: e.target.value })}
@@ -274,83 +252,10 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">자기소개</p>
-                    <p className="text-sm">
-                      {profile.bio || '자기소개가 없습니다.'}
-                    </p>
+                    <p className="text-sm whitespace-pre-wrap">{profile.bio || '자기소개가 없습니다.'}</p>
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* 계정 정보 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>계정 정보</CardTitle>
-              <CardDescription>
-                보안 및 로그인 정보
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium">이메일</p>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                </div>
-                <Badge variant="outline" className="text-green-600">인증됨</Badge>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium">마지막 로그인</p>
-                  <p className="text-sm text-muted-foreground">
-                    {user.metadata.lastSignInTime ? 
-                      new Date(user.metadata.lastSignInTime).toLocaleString('ko-KR') : 
-                      '정보 없음'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    auth.signOut();
-                    document.cookie = 'session=; path=/; max-age=0';
-                    router.push('/login');
-                    toast.success('로그아웃되었습니다');
-                  }}
-                >
-                  로그아웃
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 활동 통계 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>활동 통계</CardTitle>
-              <CardDescription>
-                프로젝트 참여 및 기여도
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-indigo-600">12</p>
-                  <p className="text-xs text-muted-foreground">아이디어</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-purple-600">28</p>
-                  <p className="text-xs text-muted-foreground">댓글</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">5</p>
-                  <p className="text-xs text-muted-foreground">프로젝트</p>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>

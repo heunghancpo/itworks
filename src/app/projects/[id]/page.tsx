@@ -1,0 +1,511 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import ReactFlow, {
+  useNodesState,
+  useEdgesState,
+  ConnectionLineType,
+  Controls,
+  Background,
+  MiniMap,
+  Panel,
+  MarkerType,
+  Connection,
+  Edge,
+  Node,
+  NodeChange,
+  applyNodeChanges,
+  EdgeChange,
+  applyEdgeChanges,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import dagre from 'dagre';
+
+import { auth, db } from '@/lib/firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { IdeaDetailDialog } from '@/components/idea-detail-dialog';
+import IdeaNode from '@/components/canvas/idea-node';
+import MemoNode from '@/components/canvas/memo-node';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ArrowLeft, Share2, Database, Plus, Loader2, StickyNote } from 'lucide-react';
+import { 
+  addComment, 
+  addResource, 
+  createIdea, 
+  createMemo, 
+  updateMemo, 
+  deleteMemo,
+  deleteIdea,
+  connectIdeas,
+  getComments,
+  getResources,
+  getEvolvedIdeas,
+  updateIdea 
+} from '@/lib/firestore-helpers';
+import { DBInitializer } from '@/components/db-initializer';
+import toast from 'react-hot-toast';
+
+const nodeTypes = {
+  ideaNode: IdeaNode,
+  memoNode: MemoNode,
+};
+
+const getLayoutedElements = (nodes: any[], edges: any[]) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+  const nodeWidth = 280;
+  const nodeHeight = 150;
+  dagreGraph.setGraph({ rankdir: 'TB', ranksep: 100, nodesep: 80 });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const layoutedNodes = nodes.map((node) => {
+    if (node.position.x !== 0 || node.position.y !== 0) return node;
+    const nodeWithPosition = dagreGraph.node(node.id);
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+};
+
+export default function ProjectCanvasPage() {
+  const { id: projectId } = useParams();
+  const router = useRouter();
+  const [user] = useAuthState(auth);
+  
+  const [project, setProject] = useState<any>(null);
+  
+  const [nodes, setNodes] = useNodesState([]);
+  const [edges, setEdges] = useEdgesState([]);
+  
+  const [selectedIdea, setSelectedIdea] = useState<any>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  const [isCreateRootOpen, setIsCreateRootOpen] = useState(false);
+  const [rootTitle, setRootTitle] = useState('');
+  const [rootContent, setRootContent] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    [setNodes]
+  );
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    [setEdges]
+  );
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const fetchProject = async () => {
+      const docRef = doc(db, 'projects', projectId as string);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) setProject({ id: docSnap.id, ...docSnap.data() });
+    };
+    fetchProject();
+
+    const qIdeas = query(collection(db, 'ideas'), where('projectId', '==', projectId));
+    const qMemos = query(collection(db, 'memos'), where('projectId', '==', projectId));
+    const qConns = query(collection(db, 'connections'), where('projectId', '==', projectId));
+
+    const unsubscribeIdeas = onSnapshot(qIdeas, (ideaSnap) => {
+      const ideas = ideaSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      onSnapshot(qMemos, (memoSnap) => {
+        const memos = memoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        onSnapshot(qConns, (connSnap) => {
+          const connections = connSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          updateGraph(ideas, memos, connections);
+        });
+      });
+    });
+
+    return () => {
+      unsubscribeIdeas();
+    };
+  }, [projectId]);
+
+  const updateGraph = (ideas: any[], memos: any[], connections: any[]) => {
+    const ideaNodes = ideas.map((idea: any) => ({
+      id: idea.id,
+      type: 'ideaNode',
+      data: { 
+        ...idea,
+        author: {
+          id: idea.authorId,
+          name: idea.authorName,
+          avatar: idea.authorAvatar
+        },
+        // 🚨 리사이즈 핸들러 전달 (data를 통해 Node로 전달)
+        onResize: (width: number, height: number) => updateIdea(idea.id, { width, height })
+      },
+      position: idea.position || { x: 0, y: 0 },
+      style: idea.width && idea.height ? { width: idea.width, height: idea.height } : undefined,
+    }));
+
+    const memoNodes = memos.map((memo: any) => ({
+      id: memo.id,
+      type: 'memoNode',
+      position: memo.position || { x: 100, y: 100 },
+      style: memo.width && memo.height ? { width: memo.width, height: memo.height } : undefined,
+      data: { 
+        ...memo, 
+        onDelete: handleDeleteMemo, 
+        onUpdate: handleUpdateMemo,
+        // 🚨 리사이즈 핸들러 전달
+        onResize: (width: number, height: number) => updateMemo(memo.id, { width, height })
+      },
+    }));
+
+    const hierEdges = ideas
+      .filter((idea: any) => idea.parentId)
+      .map((idea: any) => ({
+        id: `e-${idea.parentId}-${idea.id}`,
+        source: idea.parentId,
+        target: idea.id,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#6366f1', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+      }));
+
+    const customEdges = connections.map(conn => ({
+      id: conn.id,
+      source: conn.source,
+      target: conn.target,
+      animated: true,
+      style: { stroke: '#f59e0b', strokeWidth: 2, strokeDasharray: '5,5' },
+      data: { isCustom: true },
+    }));
+
+    const { nodes: layoutedIdeaNodes, edges: layoutedEdges } = getLayoutedElements(
+      ideaNodes,
+      hierEdges
+    );
+
+    setNodes([...layoutedIdeaNodes, ...memoNodes]);
+    setEdges([...layoutedEdges, ...customEdges]);
+  };
+
+  // --- 이벤트 핸들러 ---
+
+  const onNodeDragStop = useCallback((event: any, node: Node) => {
+    if (node.type === 'ideaNode') {
+      updateIdea(node.id, { position: node.position });
+    } else if (node.type === 'memoNode') {
+      updateMemo(node.id, { position: node.position });
+    }
+  }, []);
+
+  const onConnect = useCallback(
+    async (params: Connection) => {
+      if (!user || !params.source || !params.target) return;
+      await connectIdeas(params.source, params.target, projectId as string);
+      toast.success('연결되었습니다');
+    },
+    [projectId, user]
+  );
+
+  const handleDeleteMemo = async (memoId: string) => {
+    if (confirm('메모를 삭제하시겠습니까?')) {
+      await deleteMemo(memoId);
+    }
+  };
+
+  const handleUpdateMemo = async (memoId: string, content: string) => {
+    await updateMemo(memoId, { content });
+  };
+
+  const handleAddMemo = async () => {
+    if (!user) return;
+    const centerX = 200 + Math.random() * 100;
+    const centerY = 200 + Math.random() * 100;
+    
+    await createMemo({
+      projectId: projectId as string,
+      content: '',
+      color: 'yellow',
+      position: { x: centerX, y: centerY },
+      authorId: user.uid,
+    });
+  };
+
+  const onNodesDelete = useCallback(
+    async (nodesToDelete: Node[]) => {
+      for (const node of nodesToDelete) {
+        if (node.type === 'memoNode') {
+          await deleteMemo(node.id);
+        } else if (node.type === 'ideaNode') {
+          if (confirm(`'${node.data.title}' 아이디어를 정말 삭제하시겠습니까?`)) {
+            await deleteIdea(node.id);
+          } else {
+            toast('아이디어 삭제가 취소되었습니다. 화면을 새로고침해주세요.');
+          }
+        }
+      }
+    },
+    []
+  );
+
+  const onNodeClick = (_: any, node: any) => {
+    if (node.type === 'ideaNode') {
+      fetchIdeaDetails(node.data);
+      setIsDetailOpen(true);
+    }
+  };
+
+  // 🚨 수정됨: evolvedIdeas 데이터 매핑 (TypeError 방지)
+  const fetchIdeaDetails = async (ideaData: any) => {
+    try {
+      const [comments, resources, rawEvolvedIdeas] = await Promise.all([
+        getComments(ideaData.id),
+        getResources(ideaData.id),
+        getEvolvedIdeas(ideaData.id),
+      ]);
+
+      // author 정보가 flat하게 들어오는 것을 객체로 변환
+      const evolvedIdeas = rawEvolvedIdeas.map((item: any) => ({
+        ...item,
+        author: {
+          id: item.authorId,
+          name: item.authorName,
+          avatar: item.authorAvatar
+        }
+      }));
+      
+      setSelectedIdea({ ...ideaData, comments, resources, evolved_ideas: evolvedIdeas });
+    } catch (e) {
+      console.error(e);
+      setSelectedIdea(ideaData);
+    }
+  };
+
+  const handleSubmitComment = async (content: string) => {
+    if (!user || !selectedIdea) return;
+    await addComment(selectedIdea.id, {
+      content,
+      authorId: user.uid,
+      authorName: user.displayName || '익명',
+      authorAvatar: user.photoURL || '',
+    });
+    fetchIdeaDetails(selectedIdea);
+  };
+
+  const handleUploadResource = async (resource: any) => {
+    if (!user || !selectedIdea) return;
+    await addResource(selectedIdea.id, {
+      ...resource,
+      uploadedBy: user.uid,
+      uploadedByName: user.displayName || '익명',
+    });
+    fetchIdeaDetails(selectedIdea);
+  };
+
+  const handleCreateEvolution = async (title: string, content: string) => {
+    if (!user || !selectedIdea) return;
+    const parentNode = nodes.find(n => n.id === selectedIdea.id);
+    const newPos = parentNode ? { 
+      x: parentNode.position.x + 100, 
+      y: parentNode.position.y + 250 
+    } : { x: 0, y: 0 };
+
+    await createIdea({
+      projectId: projectId as string,
+      businessId: project?.businessId,
+      title,
+      content,
+      priority: 'medium',
+      tags: [],
+      authorId: user.uid,
+      authorName: user.displayName || '익명',
+      authorAvatar: user.photoURL || '',
+      parentId: selectedIdea.id,
+      position: newPos,
+    });
+    toast.success('아이디어가 가지를 쳤습니다! 🌱');
+    setIsDetailOpen(false);
+  };
+
+  const handleCreateRootIdeaSubmit = async () => {
+    if (!user || !rootTitle.trim()) {
+      toast.error('제목을 입력해주세요.');
+      return;
+    }
+    setIsCreating(true);
+    try {
+      await createIdea({
+        projectId: projectId as string,
+        businessId: project?.businessId,
+        title: rootTitle,
+        content: rootContent || '프로젝트의 시작점입니다.',
+        priority: 'high',
+        tags: ['New'],
+        authorId: user.uid,
+        authorName: user.displayName || '익명',
+        authorAvatar: user.photoURL || '',
+        position: { x: 300, y: 100 }
+      });
+      toast.success('아이디어 등록 완료');
+      setIsCreateRootOpen(false);
+      setRootTitle('');
+      setRootContent('');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <div className="h-screen w-full flex flex-col bg-slate-50">
+      <div className="h-16 border-b bg-white flex items-center px-6 justify-between z-10 shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/projects')}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="font-bold text-lg flex items-center gap-2">
+              {project?.title || 'Loading...'}
+              <span className="text-xs font-normal text-muted-foreground px-2 py-0.5 bg-slate-100 rounded-full border">
+                Canvas View
+              </span>
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleAddMemo} className="gap-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border-yellow-200">
+            <StickyNote className="w-4 h-4" /> 메모
+          </Button>
+          <Button size="sm" onClick={() => setIsCreateRootOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> 아이디어
+          </Button>
+          <DBInitializer />
+          <Button size="sm" variant="outline">
+            <Share2 className="w-4 h-4 mr-2" /> 공유
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full h-full relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeDragStop={onNodeDragStop}
+          // 🚨 수정됨: onNodeResizeStop 제거 (노드 내부에서 처리)
+          onNodesDelete={onNodesDelete}
+          nodeTypes={nodeTypes}
+          onNodeClick={onNodeClick}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          fitView
+          minZoom={0.1}
+          maxZoom={2}
+        >
+          <Background color="#e2e8f0" gap={20} size={1} />
+          <Controls className="bg-white border shadow-md" />
+          <MiniMap 
+            className="bg-white border shadow-md rounded-lg overflow-hidden" 
+            nodeColor={(node) => node.type === 'memoNode' ? '#fde047' : '#3b82f6'}
+          />
+          <Panel position="top-right" className="bg-white/90 backdrop-blur p-3 rounded-lg shadow-lg border m-4">
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-bold text-slate-500 mb-1">Status</div>
+              <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 bg-blue-500 rounded-full"/> 제안됨</div>
+              <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 bg-purple-500 rounded-full"/> 논의중</div>
+              <div className="flex items-center gap-2 text-xs"><div className="w-3 h-3 bg-green-500 rounded-full"/> 승인됨</div>
+            </div>
+          </Panel>
+        </ReactFlow>
+      </div>
+
+      {selectedIdea && (
+        <IdeaDetailDialog
+          idea={selectedIdea}
+          isOpen={isDetailOpen}
+          onClose={() => setIsDetailOpen(false)}
+          onSubmitComment={handleSubmitComment}
+          onUploadResource={handleUploadResource}
+          onCreateEvolution={handleCreateEvolution}
+        />
+      )}
+
+      <Dialog open={isCreateRootOpen} onOpenChange={setIsCreateRootOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>새로운 아이디어 제안</DialogTitle>
+            <DialogDescription>
+              프로젝트에 새로운 흐름을 만들 아이디어를 기록하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">제목</label>
+              <Input
+                placeholder="아이디어의 핵심 주제"
+                value={rootTitle}
+                onChange={(e) => setRootTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">상세 내용</label>
+              <Textarea
+                placeholder="구체적인 실행 방안이나 배경을 설명해주세요."
+                value={rootContent}
+                onChange={(e) => setRootContent(e.target.value)}
+                rows={5}
+              />
+            </div>
+            {user && (
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md text-sm border">
+                <span className="text-muted-foreground font-medium">기안자</span>
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={user.photoURL || ''} />
+                    <AvatarFallback>{user.displayName?.[0] || '?'}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-semibold text-slate-700">{user.displayName || user.email}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCreateRootOpen(false)}>취소</Button>
+            <Button onClick={handleCreateRootIdeaSubmit} disabled={isCreating}>
+              {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              아이디어 등록
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

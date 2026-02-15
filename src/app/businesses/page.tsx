@@ -39,7 +39,8 @@ export default function BusinessesPage() {
           
           {/* HeungHan */}
           <Link href="/businesses/heunghan">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" asChild>
+            {/* 🚨 수정됨: asChild 제거 */}
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group h-full">
               <CardHeader>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-600 transition-colors">
                   <Globe className="h-6 w-6 text-green-600 group-hover:text-white transition-colors" />
@@ -60,7 +61,8 @@ export default function BusinessesPage() {
 
           {/* Substract Lab */}
           <Link href="/businesses/substract">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" asChild>
+            {/* 🚨 수정됨: asChild 제거 */}
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group h-full">
               <CardHeader>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
                   <Lightbulb className="h-6 w-6 text-blue-600 group-hover:text-white transition-colors" />
@@ -81,7 +83,8 @@ export default function BusinessesPage() {
 
           {/* Sensus */}
           <Link href="/businesses/sensus">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer group" asChild>
+            {/* 🚨 수정됨: asChild 제거 */}
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group h-full">
               <CardHeader>
                 <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-600 transition-colors">
                   <Coffee className="h-6 w-6 text-orange-600 group-hover:text-white transition-colors" />

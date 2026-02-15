@@ -134,7 +134,7 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => quickLogin('ceo@koreaheung.com')}
+                  onClick={() => quickLogin('founder@koreaheung.com')}
                 >
                   현서 (CEO)
                 </Button>
@@ -148,9 +148,9 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => quickLogin('cso@koreaheung.com')}
+                  onClick={() => quickLogin('cpo@koreaheung.com')}
                 >
-                  정호 (CSO)
+                  정호 (CPO)
                 </Button>
               </div>
             </div>

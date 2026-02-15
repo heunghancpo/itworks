@@ -25,6 +25,7 @@ import { db } from './firebase';
 
 export const ideasCollection = collection(db, 'ideas');
 
+// createIdea 함수 업데이트
 export async function createIdea(data: {
   projectId: string;
   businessId: string;
@@ -36,6 +37,8 @@ export async function createIdea(data: {
   authorName: string;
   authorAvatar?: string;
   parentId?: string;
+  // ✨ 위치 정보 추가 (선택)
+  position?: { x: number; y: number };
 }) {
   return await addDoc(ideasCollection, {
     ...data,
@@ -43,6 +46,11 @@ export async function createIdea(data: {
     likesCount: 0,
     commentsCount: 0,
     resourcesCount: 0,
+    // ✨ 위치 정보가 없으면 기본값(0,0) 저장 (나중에 캔버스에서 레이아웃 처리)
+    position: data.position || { x: 0, y: 0 },
+    // ✨ 기본 크기 저장 (선택)
+    width: 280, 
+    // height는 내용에 따라 가변적이므로 초기엔 저장하지 않거나 auto로 둠
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -316,4 +324,57 @@ export function timestampToDate(timestamp: any): Date | null {
     return timestamp.toDate();
   }
   return null;
+}
+
+// ============================================
+// Memos (Sticky Notes) 관련 함수
+// ============================================
+
+export async function createMemo(data: {
+  projectId: string;
+  content: string;
+  color?: string;
+  position: { x: number; y: number };
+  authorId: string;
+}) {
+  return await addDoc(collection(db, 'memos'), {
+    ...data,
+    color: data.color || 'yellow',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateMemo(memoId: string, data: Partial<any>) {
+  const memoRef = doc(db, 'memos', memoId);
+  return await updateDoc(memoRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteMemo(memoId: string) {
+  const memoRef = doc(db, 'memos', memoId);
+  return await deleteDoc(memoRef);
+}
+
+// ============================================
+// Connections (Edges) 관련 함수
+// ============================================
+
+// 부모-자식 관계 외의 임의 연결을 저장
+export async function connectIdeas(sourceId: string, targetId: string, projectId: string) {
+  // 중복 체크 로직 생략 (필요시 추가)
+  return await addDoc(collection(db, 'connections'), {
+    projectId,
+    source: sourceId,
+    target: targetId,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getConnections(projectId: string) {
+  const q = query(collection(db, 'connections'), where('projectId', '==', projectId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }

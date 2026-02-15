@@ -178,7 +178,7 @@ export default function HomePage() {
               호
             </div>
             <h3 className="font-bold mb-1">이정호</h3>
-            <p className="text-sm text-muted-foreground mb-2">CSO</p>
+            <p className="text-sm text-muted-foreground mb-2">CPO</p>
             <p className="text-xs text-muted-foreground">
               전략, 설계, 기획
             </p>

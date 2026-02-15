@@ -1,6 +1,7 @@
+// src/components/idea-detail-dialog.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,47 +22,21 @@ import {
   FileText,
   Send,
   TrendingUp,
-  Download,
   ExternalLink,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { Timestamp } from 'firebase/firestore'; // Firestore Timestamp 타입 임포트
 
-interface Comment {
-  id: string;
-  content: string;
-  author: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-  created_at: string;
-}
-
-interface Resource {
-  id: string;
-  type: 'file' | 'link' | 'paper' | 'dataset' | 'code' | 'document';
-  title: string;
-  url: string;
-  description?: string;
-  metadata?: {
-    size?: string;
-    author?: string;
-  };
-  uploaded_by: {
-    name: string;
-  };
-  created_at: string;
-}
-
-interface EvolutionIdea {
-  id: string;
-  title: string;
-  author: {
-    name: string;
-  };
-  created_at: string;
-  status: string;
+// 날짜 변환 헬퍼 함수
+function getSafeDate(date: any) {
+  if (!date) return new Date();
+  // Firestore Timestamp인 경우 toDate() 호출
+  if (date instanceof Timestamp || (date && typeof date.toDate === 'function')) {
+    return date.toDate();
+  }
+  // 이미 Date 객체이거나 문자열/숫자인 경우
+  return new Date(date);
 }
 
 interface IdeaDetailDialogProps {
@@ -72,24 +47,6 @@ interface IdeaDetailDialogProps {
   onUploadResource: (resource: { type: string; title: string; url: string; description?: string }) => Promise<void>;
   onCreateEvolution: (title: string, content: string) => Promise<void>;
 }
-
-const resourceTypeIcons = {
-  file: FileText,
-  link: LinkIcon,
-  paper: FileText,
-  dataset: FileText,
-  code: FileText,
-  document: FileText,
-};
-
-const resourceTypeLabels = {
-  file: '파일',
-  link: '링크',
-  paper: '논문',
-  dataset: '데이터셋',
-  code: '코드',
-  document: '문서',
-};
 
 export function IdeaDetailDialog({
   idea,
@@ -102,19 +59,18 @@ export function IdeaDetailDialog({
   const [commentContent, setCommentContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 리소스 추가 폼
+  // 리소스 추가 폼 상태
   const [resourceType, setResourceType] = useState<string>('link');
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceUrl, setResourceUrl] = useState('');
   const [resourceDescription, setResourceDescription] = useState('');
   
-  // 아이디어 발전 폼
+  // 아이디어 발전 폼 상태
   const [evolutionTitle, setEvolutionTitle] = useState('');
   const [evolutionContent, setEvolutionContent] = useState('');
 
   const handleSubmitComment = async () => {
     if (!commentContent.trim()) return;
-    
     setIsSubmitting(true);
     try {
       await onSubmitComment(commentContent);
@@ -126,15 +82,12 @@ export function IdeaDetailDialog({
 
   const handleAddResource = async () => {
     if (!resourceTitle.trim() || !resourceUrl.trim()) return;
-    
     await onUploadResource({
       type: resourceType,
       title: resourceTitle,
       url: resourceUrl,
       description: resourceDescription,
     });
-    
-    // 폼 초기화
     setResourceTitle('');
     setResourceUrl('');
     setResourceDescription('');
@@ -142,10 +95,7 @@ export function IdeaDetailDialog({
 
   const handleCreateEvolution = async () => {
     if (!evolutionTitle.trim() || !evolutionContent.trim()) return;
-    
     await onCreateEvolution(evolutionTitle, evolutionContent);
-    
-    // 폼 초기화
     setEvolutionTitle('');
     setEvolutionContent('');
   };
@@ -156,40 +106,44 @@ export function IdeaDetailDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{idea.title}</DialogTitle>
+          <div className="flex items-start justify-between gap-4">
+            <DialogTitle className="text-2xl font-bold leading-tight">{idea.title}</DialogTitle>
+            <Badge variant={idea.status === 'approved' ? 'default' : 'secondary'} className="shrink-0">
+              {idea.status}
+            </Badge>
+          </div>
           <DialogDescription className="flex items-center gap-2 mt-2">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={idea.author.avatar} />
-              <AvatarFallback>{idea.author.name[0]}</AvatarFallback>
+              {/* author 객체 안전하게 접근 */}
+              <AvatarImage src={idea.author?.avatar} />
+              <AvatarFallback>{idea.author?.name?.[0] || '?'}</AvatarFallback>
             </Avatar>
-            <span>{idea.author.name}</span>
-            <span>•</span>
-            <span>{formatDistanceToNow(new Date(idea.created_at), { addSuffix: true, locale: ko })}</span>
+            <span className="font-medium text-foreground">{idea.author?.name || '익명'}</span>
+            <span className="text-muted-foreground">•</span>
+            {/* ✅ 날짜 오류 수정 적용됨 */}
+            <span>{formatDistanceToNow(getSafeDate(idea.createdAt), { addSuffix: true, locale: ko })}</span>
           </DialogDescription>
         </DialogHeader>
 
-        {/* 아이디어 내용 */}
-        <div className="space-y-4 mt-4">
-          <div>
-            <h3 className="font-semibold mb-2">아이디어 설명</h3>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+        {/* 본문 내용 */}
+        <div className="space-y-6 mt-4">
+          <div className="bg-slate-50 p-4 rounded-lg border">
+            <p className="text-sm whitespace-pre-wrap leading-relaxed text-slate-700">
               {idea.content}
             </p>
           </div>
 
-          {/* 부모 아이디어 */}
-          {idea.parent_idea && (
-            <div className="bg-muted p-4 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                <TrendingUp className="h-4 w-4" />
-                <span>이전 아이디어</span>
-              </div>
-              <p className="font-medium">{idea.parent_idea.title}</p>
+          {/* 태그 목록 */}
+          {idea.tags && idea.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {idea.tags.map((tag: string) => (
+                <Badge key={tag} variant="outline" className="text-slate-500">#{tag}</Badge>
+              ))}
             </div>
           )}
 
           <Tabs defaultValue="discussion" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-100">
               <TabsTrigger value="discussion">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 논의 ({idea.comments?.length || 0})
@@ -204,215 +158,121 @@ export function IdeaDetailDialog({
               </TabsTrigger>
             </TabsList>
 
-            {/* 논의 탭 */}
+            {/* 논의(댓글) 탭 */}
             <TabsContent value="discussion" className="space-y-4 mt-4">
-              {/* 댓글 목록 */}
-              <div className="space-y-4">
-                {idea.comments?.map((comment: Comment) => (
-                  <div key={comment.id} className="flex gap-3">
-                    <Avatar className="h-8 w-8">
+              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                {idea.comments?.map((comment: any) => (
+                  <div key={comment.id} className="flex gap-3 text-sm">
+                    <Avatar className="h-8 w-8 mt-1">
                       <AvatarImage src={comment.author.avatar} />
                       <AvatarFallback>{comment.author.name[0]}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-sm">{comment.author.name}</span>
+                    <div className="flex-1 bg-white p-3 rounded-lg border shadow-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold">{comment.author.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ko })}
+                          {formatDistanceToNow(getSafeDate(comment.createdAt), { addSuffix: true, locale: ko })}
                         </span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+                      <p className="text-slate-700 whitespace-pre-wrap">{comment.content}</p>
                     </div>
                   </div>
                 ))}
-
-                {!idea.comments || idea.comments.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    아직 논의가 없습니다. 첫 의견을 남겨보세요!
-                  </p>
+                {(!idea.comments || idea.comments.length === 0) && (
+                  <p className="text-sm text-muted-foreground text-center py-8">첫 의견을 남겨보세요!</p>
                 )}
               </div>
-
-              {/* 댓글 작성 */}
-              <div className="space-y-2 pt-4 border-t">
-                <Textarea
+              <div className="flex gap-2 pt-2">
+                <Input
                   placeholder="의견을 남겨주세요..."
                   value={commentContent}
                   onChange={(e) => setCommentContent(e.target.value)}
-                  rows={3}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmitComment()}
                 />
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleSubmitComment}
-                    disabled={isSubmitting || !commentContent.trim()}
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    댓글 달기
-                  </Button>
-                </div>
+                <Button onClick={handleSubmitComment} disabled={isSubmitting || !commentContent.trim()}>
+                  <Send className="h-4 w-4" />
+                </Button>
               </div>
             </TabsContent>
 
             {/* 리소스 탭 */}
             <TabsContent value="resources" className="space-y-4 mt-4">
-              {/* 리소스 목록 */}
-              <div className="space-y-3">
-                {idea.resources?.map((resource: Resource) => {
-                  const Icon = resourceTypeIcons[resource.type];
-                  return (
-                    <div key={resource.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50">
-                      <Icon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-sm">{resource.title}</h4>
-                          <Badge variant="secondary" className="text-xs">
-                            {resourceTypeLabels[resource.type]}
-                          </Badge>
-                        </div>
-                        {resource.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{resource.description}</p>
-                        )}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>{resource.uploaded_by.name}</span>
-                          <span>
-                            {formatDistanceToNow(new Date(resource.created_at), { addSuffix: true, locale: ko })}
-                          </span>
-                        </div>
+              <div className="space-y-2">
+                {idea.resources?.map((resource: any) => (
+                  <a key={resource.id} href={resource.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-slate-100 p-2 rounded">
+                        {resource.type === 'link' ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                       </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={resource.url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </Button>
+                      <div>
+                        <p className="font-medium text-sm">{resource.title}</p>
+                        <p className="text-xs text-muted-foreground">{resource.description || resource.url}</p>
+                      </div>
                     </div>
-                  );
-                })}
-
-                {!idea.resources || idea.resources.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    아직 첨부된 리소스가 없습니다.
-                  </p>
-                )}
+                    <ExternalLink className="h-4 w-4 text-slate-400" />
+                  </a>
+                ))}
               </div>
-
-              {/* 리소스 추가 */}
-              <div className="space-y-3 pt-4 border-t">
-                <h4 className="font-semibold text-sm">리소스 추가</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground">종류</label>
-                    <select
-                      className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
-                      value={resourceType}
-                      onChange={(e) => setResourceType(e.target.value)}
-                    >
-                      <option value="link">링크</option>
-                      <option value="paper">논문</option>
-                      <option value="dataset">데이터셋</option>
-                      <option value="code">코드</option>
-                      <option value="document">문서</option>
-                      <option value="file">파일</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">제목</label>
-                    <Input
-                      placeholder="리소스 제목"
-                      value={resourceTitle}
-                      onChange={(e) => setResourceTitle(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">URL</label>
-                  <Input
-                    placeholder="https://..."
-                    value={resourceUrl}
-                    onChange={(e) => setResourceUrl(e.target.value)}
-                    className="mt-1"
+              <div className="border-t pt-4 space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  <select 
+                    className="col-span-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={resourceType}
+                    onChange={(e) => setResourceType(e.target.value)}
+                  >
+                    <option value="link">링크</option>
+                    <option value="file">파일</option>
+                  </select>
+                  <Input 
+                    placeholder="제목" 
+                    className="col-span-3"
+                    value={resourceTitle}
+                    onChange={(e) => setResourceTitle(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">설명 (선택)</label>
-                  <Textarea
-                    placeholder="리소스에 대한 간단한 설명..."
-                    value={resourceDescription}
-                    onChange={(e) => setResourceDescription(e.target.value)}
-                    rows={2}
-                    className="mt-1"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button onClick={handleAddResource} size="sm">
-                    <Paperclip className="h-4 w-4 mr-2" />
-                    리소스 추가
-                  </Button>
-                </div>
+                <Input 
+                  placeholder="URL 주소" 
+                  value={resourceUrl}
+                  onChange={(e) => setResourceUrl(e.target.value)}
+                />
+                <Button onClick={handleAddResource} className="w-full" size="sm" variant="outline">
+                  <Paperclip className="h-4 w-4 mr-2" /> 리소스 추가
+                </Button>
               </div>
             </TabsContent>
 
             {/* 발전 경로 탭 */}
             <TabsContent value="evolution" className="space-y-4 mt-4">
-              {/* 발전된 아이디어 목록 */}
               <div className="space-y-3">
-                {idea.evolved_ideas?.map((evolved: EvolutionIdea) => (
-                  <div key={evolved.id} className="p-3 border rounded-lg hover:bg-muted/50">
-                    <div className="flex items-start gap-2">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground mt-1" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{evolved.title}</h4>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <span>{evolved.author.name}</span>
-                          <span>•</span>
-                          <span>{formatDistanceToNow(new Date(evolved.created_at), { addSuffix: true, locale: ko })}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {evolved.status}
-                          </Badge>
-                        </div>
-                      </div>
+                {idea.evolved_ideas?.map((evolved: any) => (
+                  <div key={evolved.id} className="p-3 border border-indigo-100 bg-indigo-50/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="h-4 w-4 text-indigo-600" />
+                      <span className="font-semibold text-sm text-indigo-900">{evolved.title}</span>
+                    </div>
+                    <div className="text-xs text-indigo-700 flex gap-2">
+                      <span>{evolved.author.name}</span>
+                      <span>•</span>
+                      <span>{formatDistanceToNow(getSafeDate(evolved.createdAt), { addSuffix: true, locale: ko })}</span>
                     </div>
                   </div>
                 ))}
-
-                {!idea.evolved_ideas || idea.evolved_ideas.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    아직 발전된 아이디어가 없습니다.
-                  </p>
-                )}
               </div>
-
-              {/* 새 아이디어 작성 */}
-              <div className="space-y-3 pt-4 border-t">
-                <h4 className="font-semibold text-sm flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  이 아이디어를 발전시켜보세요
-                </h4>
-                <div>
-                  <label className="text-xs text-muted-foreground">발전된 아이디어 제목</label>
-                  <Input
-                    placeholder="새로운 아이디어 제목..."
-                    value={evolutionTitle}
-                    onChange={(e) => setEvolutionTitle(e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">내용</label>
-                  <Textarea
-                    placeholder="어떻게 발전시킬 수 있을까요?"
-                    value={evolutionContent}
-                    onChange={(e) => setEvolutionContent(e.target.value)}
-                    rows={4}
-                    className="mt-1"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button onClick={handleCreateEvolution}>
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    발전된 아이디어 만들기
-                  </Button>
-                </div>
+              <div className="border-t pt-4 space-y-3">
+                <Input 
+                  placeholder="발전된 아이디어 제목" 
+                  value={evolutionTitle}
+                  onChange={(e) => setEvolutionTitle(e.target.value)}
+                />
+                <Textarea 
+                  placeholder="어떻게 발전시킬 수 있을까요?" 
+                  value={evolutionContent}
+                  onChange={(e) => setEvolutionContent(e.target.value)}
+                  rows={2}
+                />
+                <Button onClick={handleCreateEvolution} className="w-full bg-indigo-600 hover:bg-indigo-700">
+                  <TrendingUp className="h-4 w-4 mr-2" /> 가지 뻗기 (Evolve)
+                </Button>
               </div>
             </TabsContent>
           </Tabs>
