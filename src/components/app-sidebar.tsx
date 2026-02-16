@@ -32,7 +32,6 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     await auth.signOut();
-    document.cookie = 'session=; path=/; max-age=0';
     router.push('/login');
   };
 
@@ -58,7 +57,7 @@ export function AppSidebar() {
     <>
       {/* 로고 영역 */}
       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl text-indigo-600">
+        <Link href="/" className="flex items-center gap-2 font-bold text-xl text-indigo-600">
           <Rocket className="h-6 w-6" />
           ItWorks
         </Link>
@@ -126,7 +125,7 @@ export function AppSidebar() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <Link href="/dashboard" className="ml-2 flex items-center gap-1.5 font-bold text-indigo-600">
+          <Link href="/" className="ml-2 flex items-center gap-1.5 font-bold text-indigo-600">
             <Rocket className="h-5 w-5" />
             ItWorks
           </Link>

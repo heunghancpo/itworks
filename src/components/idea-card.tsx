@@ -59,12 +59,19 @@ const statusLabels: any = {
   rejected: '보류',
 };
 
+// HTML 태그를 제거하여 순수 텍스트 추출
+function stripHtml(html: string): string {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+}
+
 export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, onEdit, onStatusChange, isLiked = false }: IdeaCardProps) {
   const [showFullContent, setShowFullContent] = useState(false);
-  
-  const shortContent = idea.content.length > 150 
-    ? idea.content.substring(0, 150) + '...' 
-    : idea.content;
+
+  const plainContent = stripHtml(idea.content);
+  const shortContent = plainContent.length > 150
+    ? plainContent.substring(0, 150) + '...'
+    : plainContent;
 
   // 프로젝트 정보 안전하게 접근
   const projectTitle = idea.project?.title || '';
@@ -182,10 +189,10 @@ export function IdeaCard({ idea, onLike, onComment, onEvolve, onDelete, onEdit, 
 
       <CardContent className="pb-3 flex-1">
         <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
-          {showFullContent ? idea.content : shortContent}
+          {showFullContent ? plainContent : shortContent}
         </p>
-        
-        {idea.content.length > 150 && (
+
+        {plainContent.length > 150 && (
           <Button
             variant="link"
             size="sm"

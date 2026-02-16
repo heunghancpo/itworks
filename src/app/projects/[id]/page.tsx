@@ -167,21 +167,30 @@ export default function ProjectCanvasPage() {
     const qMemos = query(collection(db, 'memos'), where('projectId', '==', projectId));
     const qConns = query(collection(db, 'connections'), where('projectId', '==', projectId));
 
-    const unsubscribeIdeas = onSnapshot(qIdeas, (ideaSnap) => {
-      const ideas = ideaSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      onSnapshot(qMemos, (memoSnap) => {
-        const memos = memoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        onSnapshot(qConns, (connSnap) => {
-          const connections = connSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          updateGraph(ideas, memos, connections);
-        });
-      });
+    // 각 컬렉션 데이터를 독립적으로 추적
+    let latestIdeas: any[] = [];
+    let latestMemos: any[] = [];
+    let latestConns: any[] = [];
+
+    const refresh = () => updateGraph(latestIdeas, latestMemos, latestConns);
+
+    const unsubIdeas = onSnapshot(qIdeas, (snap) => {
+      latestIdeas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      refresh();
+    });
+    const unsubMemos = onSnapshot(qMemos, (snap) => {
+      latestMemos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      refresh();
+    });
+    const unsubConns = onSnapshot(qConns, (snap) => {
+      latestConns = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+      refresh();
     });
 
     return () => {
-      unsubscribeIdeas();
+      unsubIdeas();
+      unsubMemos();
+      unsubConns();
     };
   }, [projectId]);
 

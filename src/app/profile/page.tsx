@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -17,8 +16,6 @@ import { User, Mail, Briefcase, Edit2, Save, X } from 'lucide-react';
 
 export default function ProfilePage() {
   const [user, loading] = useAuthState(auth);
-  const router = useRouter();
-  
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -30,12 +27,6 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState(profile);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
 
   useEffect(() => {
     if (user) {
