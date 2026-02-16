@@ -72,7 +72,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DBInitializer } from '@/components/db-initializer';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
@@ -548,7 +547,6 @@ export default function ProjectCanvasPage() {
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline ml-1.5">아이디어</span>
           </Button>
-          <DBInitializer />
         </div>
       </div>
 

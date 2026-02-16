@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BusinessHeader } from '@/components/business-header';
 import Link from 'next/link';
 import { 
   ArrowLeft, Globe, MapPin, ShoppingBag, 
@@ -12,20 +13,7 @@ import {
 export default function HeungHanPage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* 네비게이션 */}
-      <nav className="border-b sticky top-0 bg-white/80 backdrop-blur-sm z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" asChild>
-            <Link href="/businesses">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              사업부 목록
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/login">팀 로그인</Link>
-          </Button>
-        </div>
-      </nav>
+      <BusinessHeader currentId="heunghan" />
 
       {/* 히어로 섹션 */}
       <section className="bg-gradient-to-br from-green-50 to-emerald-100 py-24">

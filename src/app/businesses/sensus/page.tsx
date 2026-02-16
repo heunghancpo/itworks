@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BusinessHeader } from '@/components/business-header';
 import Link from 'next/link';
 import { 
   ArrowLeft, Coffee, Brain, CloudRain, 
@@ -12,20 +13,7 @@ import {
 export default function SensusPage() {
   return (
     <div className="min-h-screen bg-stone-50">
-      {/* 네비게이션 */}
-      <nav className="border-b sticky top-0 bg-stone-50/80 backdrop-blur-sm z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" asChild>
-            <Link href="/businesses">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              사업부 목록
-            </Link>
-          </Button>
-          <Button asChild className="bg-orange-900 hover:bg-orange-800">
-            <Link href="/login">팀 로그인</Link>
-          </Button>
-        </div>
-      </nav>
+      <BusinessHeader currentId="sensus" />
 
       {/* 히어로 */}
       <section className="relative py-24 overflow-hidden">

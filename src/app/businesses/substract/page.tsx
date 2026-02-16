@@ -3,26 +3,14 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BusinessHeader } from '@/components/business-header';
 import Link from 'next/link';
 import { ArrowLeft, Cpu, Camera, Waves, Award, Target, Calendar } from 'lucide-react';
 
 export default function SubstractLabPage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* 네비게이션 */}
-      <nav className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" asChild>
-            <Link href="/businesses">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              사업부 목록
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/login">팀 로그인</Link>
-          </Button>
-        </div>
-      </nav>
+      <BusinessHeader currentId="substract" />
 
       {/* 히어로 */}
       <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
