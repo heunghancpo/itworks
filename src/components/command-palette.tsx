@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Lightbulb, Cpu, Globe, Coffee,
-  Settings, Users, Search, ArrowRight, Plus,
+  Settings, Users, Search, ArrowRight, Plus, Rocket,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -33,6 +33,7 @@ export function CommandPalette() {
     { id: 'ideas', label: '아이디어 보드', description: '아이디어 목록 보기', icon: <Lightbulb className="h-4 w-4" />, action: () => go('/ideas'), keywords: ['idea', '아이디어', '보드'] },
     { id: 'ideas-new', label: '새 아이디어 작성', description: '아이디어 보드에서 새 아이디어 추가', icon: <Plus className="h-4 w-4" />, action: () => go('/ideas?create=true'), keywords: ['new', '새', '추가', '작성'] },
     { id: 'projects', label: '전체 프로젝트', description: '프로젝트 현황 보기', icon: <Cpu className="h-4 w-4" />, action: () => go('/projects'), keywords: ['project', '프로젝트'] },
+    { id: 'itworks-biz', label: 'ItWorks', description: '생산성 툴 서비스', icon: <Rocket className="h-4 w-4 text-[#97a82b]" />, action: () => go('/businesses/itworks'), keywords: ['itworks', '이게되네', '툴'] },
     { id: 'heunghan', label: 'HeungHan', description: '외국인 관광객 컨시어지', icon: <Globe className="h-4 w-4 text-green-600" />, action: () => go('/businesses/heunghan'), keywords: ['흥한', '관광'] },
     { id: 'substract', label: 'Substract Lab', description: 'AI 커피 장비 연구소', icon: <Cpu className="h-4 w-4 text-blue-600" />, action: () => go('/businesses/substract'), keywords: ['서브스트랙트', '커피', 'ai'] },
     { id: 'sensus', label: 'Sensus', description: 'AI 감각 분석 카페', icon: <Coffee className="h-4 w-4 text-orange-600" />, action: () => go('/businesses/sensus'), keywords: ['센서스', '카페'] },

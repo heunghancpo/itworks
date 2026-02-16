@@ -50,8 +50,13 @@ export function AppSidebar() {
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
-  // 로그인 페이지나 공개 페이지에서는 사이드바를 숨깁니다.
-  if (['/login', '/', '/about', '/team'].includes(pathname)) return null;
+  // 로그인 페이지나 공개 페이지(사업부 소개 포함)에서는 사이드바를 숨깁니다.
+  if (
+    ['/login', '/', '/about', '/team', '/home'].includes(pathname) ||
+    pathname?.startsWith('/businesses')
+  ) {
+    return null;
+  }
 
   const sidebarContent = (
     <>
@@ -89,6 +94,7 @@ export function AppSidebar() {
         <div>
           <h3 className="text-xs font-semibold text-slate-400 mb-2 px-2">BUSINESS UNITS</h3>
           <div className="space-y-1">
+            <SidebarItem href="/businesses/itworks" icon={Rocket} label="ItWorks" active={pathname.includes('itworks')} color="text-[#97a82b]" />
             <SidebarItem href="/businesses/heunghan" icon={Globe} label="HeungHan" active={pathname.includes('heunghan')} color="text-green-600" />
             <SidebarItem href="/businesses/substract" icon={Cpu} label="Substract Lab" active={pathname.includes('substract')} color="text-blue-600" />
             <SidebarItem href="/businesses/sensus" icon={Coffee} label="Sensus" active={pathname.includes('sensus')} color="text-orange-600" />

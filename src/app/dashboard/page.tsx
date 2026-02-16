@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Activity, Globe, Coffee, Lightbulb, ArrowRight,
-  Cpu, TrendingUp, CheckCircle2, Clock, MessageSquare,
+  Cpu, TrendingUp, CheckCircle2, Clock, MessageSquare, Rocket
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -20,6 +20,14 @@ import { ko } from 'date-fns/locale';
 import { DBInitializer } from '@/components/db-initializer';
 
 const BUSINESS_CONFIG: Record<string, { icon: React.ReactNode; color: string; borderColor: string; badgeClass: string; label: string; desc: string }> = {
+  itworks: { 
+    icon: <Rocket className="h-5 w-5 text-[#97a82b]" />, // #CBDD61보다 조금 진한 색으로 아이콘 가독성 확보
+    color: '#CBDD61', 
+    borderColor: 'border-l-[#CBDD61]', 
+    badgeClass: 'bg-[#CBDD61]/30 text-slate-800', // 배경은 연하게, 글자는 진하게
+    label: 'ItWorks', 
+    desc: '올인원 아이디어 협업 툴' 
+  },
   heunghan: { icon: <Globe className="h-5 w-5 text-green-600" />, color: 'green', borderColor: 'border-l-green-500', badgeClass: 'bg-green-100 text-green-700', label: 'HeungHan', desc: '외국인 관광객 컨시어지' },
   substract: { icon: <Cpu className="h-5 w-5 text-blue-600" />, color: 'blue', borderColor: 'border-l-blue-500', badgeClass: 'bg-blue-100 text-blue-700', label: 'Substract Lab', desc: 'AI 커피 장비 연구소' },
   sensus: { icon: <Coffee className="h-5 w-5 text-orange-600" />, color: 'orange', borderColor: 'border-l-orange-500', badgeClass: 'bg-orange-100 text-orange-700', label: 'Sensus', desc: 'AI 감각 분석 카페' },
@@ -129,7 +137,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 사업부별 현황 카드 */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {bizStats.map(biz => (
           <Link key={biz.id} href={`/businesses/${biz.id}`}>
             <Card className={`border-l-4 ${biz.config.borderColor} hover:shadow-md transition cursor-pointer h-full`}>

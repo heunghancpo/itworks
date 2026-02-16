@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { ArrowLeft, Globe, Coffee, Lightbulb, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Globe, Coffee, Lightbulb, ArrowRight, Rocket } from 'lucide-react';
 
 export default function BusinessesPage() {
   return (
@@ -35,8 +35,29 @@ export default function BusinessesPage() {
 
       {/* 사업부 목록 */}
       <section className="container mx-auto px-4 py-12">
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-4 gap-8 max-w-6xl mx-auto">
           
+          {/* ItWorks */}
+          <Link href="/businesses/itworks">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group h-full border-[#eef3cd]">
+              <CardHeader>
+                <div className="w-12 h-12 bg-[#CBDD61]/20 rounded-lg flex items-center justify-center mb-4 group-hover:bg-[#CBDD61] transition-colors">
+                  <Rocket className="h-6 w-6 text-[#97a82b] group-hover:text-white transition-colors" />
+                </div>
+                <CardTitle className="flex items-center justify-between">
+                  ItWorks
+                  <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                </CardTitle>
+                <CardDescription>All-in-One Productivity Tool</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  아이디어 보드, 캔버스, 프로젝트 관리를 하나로 통합한 자체 개발 생산성 SaaS입니다.
+                </p>
+              </CardContent>
+            </Card>  
+          </Link>
+
           {/* HeungHan */}
           <Link href="/businesses/heunghan">
             {/* 🚨 수정됨: asChild 제거 */}
